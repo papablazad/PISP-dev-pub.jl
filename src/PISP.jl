@@ -1,6 +1,6 @@
 module PISP
 
 # Write your package code here.
-include("./filterSortTimeseriesData.jl")
+include("./data_processing/filterSortTimeseriesData.jl")
 
 end
