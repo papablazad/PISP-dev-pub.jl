@@ -1,5 +1,6 @@
-function filterSortTimeseriesData(data, units::NamedTuple,
+function filterSortTimeseriesData(timeseries_data, units::NamedTuple,
     start_dt::DateTime, end_dt::DateTime,
+    static_data::DataFrame=DataFrame(), static_data_column::String="",
     scenario::Int=2,
     filter_by::String="dem_id",
     filter_values::Union{Nothing, Vector{Any}, Vector{Int}}=nothing)
@@ -8,8 +9,10 @@ function filterSortTimeseriesData(data, units::NamedTuple,
 
     ---
     Inputs
-    - data (DataFrame): The input DataFrame containing the time-series data (e.g. from *_pmax_sched.csv, *_n_sched.csv, *_emax_sched.csv, ...)
+    - timeseries_data (DataFrame): The input DataFrame containing the time-series data (e.g. from *_pmax_sched.csv, *_n_sched.csv, *_emax_sched.csv, ...)
     - units (NamedTuple): A NamedTuple specifying the time units (T) and length (L), e.g. (T = Hour, L = 1)
+    - static_data (DataFrame): The static dataframe (e.g. from Generator.csv, ESS.csv, etc.) to get the initial values from.
+    - static_data_column (String): The column name in static_data that contains the values corresponding to the values in filter_by in timeseries_data. If leaving the default value "", no default values are used (missing ones are returned as missing).
     - start_dt (DateTime): The start date/time for the filtering.
     - end_dt (DateTime): The end date/time for the filtering.
     - scenario (Int): The scenario ID to filter by (default is 2)
@@ -18,19 +21,19 @@ function filterSortTimeseriesData(data, units::NamedTuple,
 
     ---
     Example: 
-    timeseries_data = filterSortTimeseriesData(data, (T = Hour, L = 1), DateTime("2022-01-01T00:00:00"), DateTime("2022-12-31T23:00:00"), 2, "dem_id", [1, 2, 3])
+    timeseries_data = filterSortTimeseriesData(data, static_data, "n", (T = Hour, L = 1), DateTime("2022-01-01T00:00:00"), DateTime("2022-12-31T23:00:00"), 2, "dem_id", [1, 2, 3])
 
     """
     
     # ========================================
 
-    if !("date" in names(data))
-        error("Date column not found in data!")
+    if !("date" in names(timeseries_data))
+        error("Date column not found in timeseries_data for $static_data_column!")
     end
 
     # ========================================
     # Filter the data based on the provided parameters
-    filtered_data = filter(row -> row[:scenario] == scenario, data)
+    filtered_data = filter(row -> row[:scenario] == scenario, timeseries_data)
 
     # Then filter by dem_ids, gen_ids, and ess_ids if provided
     if filter_by in names(filtered_data)
@@ -38,9 +41,8 @@ function filterSortTimeseriesData(data, units::NamedTuple,
             filtered_data = filter(row -> row[filter_by] in filter_values, filtered_data)
         end
     else
-        error("$filter_by column not found in data! Did you mean $(names(data)[2])?")
+        error("$filter_by column not found in data! Did you mean $(names(timeseries_data)[2])?")
     end
-
 
     # ========================================
     # Sort the data by date
@@ -67,11 +69,16 @@ function filterSortTimeseriesData(data, units::NamedTuple,
         start_data = unstack(latest_until_start, [], filter_by, :value)
         start_data.date .= start_dt
     end
-    # And add the missing columns with a missing value 
+    # And add the missing columns with the default value
     # (in case there is a change within the time-window, but no value beforehand)
     for id in unique_ids
         if !(string(id) in names(start_data))
-            start_data[!, string(id)] = Vector{Union{Missing, Int, Float64}}([missing])
+            if static_data_column == "" # if no static data provided, return missing
+                initial_value = Vector{Union{Missing, Int, Float64}}([missing])
+            else
+                initial_value = static_data[static_data.id .== id, static_data_column]
+            end
+            start_data[!, string(id)] = initial_value
         end
     end
     
@@ -86,7 +93,6 @@ function filterSortTimeseriesData(data, units::NamedTuple,
         result = copy(resampled_data)
     end
 
-   
     # Step 5: Now add the time-series data within the time-window
     filter!(row -> row[:date] >= start_dt, sorted_data)
     for row in eachrow(sorted_data)
@@ -106,7 +112,6 @@ function filterSortTimeseriesData(data, units::NamedTuple,
 
 
     # Step 6: Add the time-series data within the time-window and forward fill missing values
-      
     for col in names(result)
         if col != "date"
             # Simple forward fill
