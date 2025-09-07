@@ -6,3 +6,10 @@ usr/usr-params.jl
 Manifest.toml
 data/*
 *.DS_Store
+*.vscode
+*.xlsx
+*.tmp
+*.csv
+*.arrow
+out/
+out-*/
