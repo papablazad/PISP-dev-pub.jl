@@ -19,265 +19,11 @@ profiledata = "/Users/papablaza/Library/CloudStorage/OneDrive-TheUniversityofMel
 # ============================================ #
 # === Fill problem table with information  === #
 # ============================================ #
-begin
-    start_date = DateTime(2025, 1, 1, 0, 0, 0)
-    step_ = Day(7) 
-    nblocks = 5
-    date_blocks = PISP.OrderedDict()
-    ref_year = 2025
-
-    for i in 1:nblocks
-        dstart = start_date + (i-1) * step_
-        dend = dstart + Day(6) + Hour(23)
-
-        if month(dend) >= 07 && month(dstart) <= 6
-            dend = DateTime(year(dstart), month(dstart), 30, 23, 0, 0)
-        end
-
-        if i>1 && day(date_blocks[i-1][2]) == 30 && month(date_blocks[i-1][2]) == 6
-            dstart = DateTime(year(dstart), month(dstart), 1, 0, 0, 0)
-        end
-
-        date_blocks[i] = (dstart, dend)
-    end
-
-    i = 1
-    for sc in keys(PISP.ID2SCE)
-        global i
-        pbname = "$(PISP.ID2SCE[sc])_$(i)"
-        nd_yr = ref_year
-        dstart = DateTime(nd_yr, month(date_blocks[i][1]), day(date_blocks[i][1]), 0, 0, 0)
-        dend   = DateTime(nd_yr, month(date_blocks[i][2]), day(date_blocks[i][2]), 23, 0, 0)
-        arr = [i, replace(pbname," "=> "_"), sc, 1, "UC", dstart, dend, 60]
-        push!(tc.problem, arr)
-        i = i + 1
-    end
-end
-# ============================================ #
-# ============= Bus table parser ============= #
-# ============================================ #
-function bus_table(ts)
-    idx = 1
-    for b in keys(PISP.NEMBUSES)
-        push!(ts.bus,(idx, b, PISP.NEMBUSNAME[b], true, PISP.NEMBUSES[b][1], PISP.NEMBUSES[b][2], PISP.STID[PISP.BUS2AREA[b]]))
-        idx += 1
-    end
-end
-
-bus_table(ts); 
-
-# ============================================ #
-# ============= Line table parser ============ #
-# ============================================ #
-begin
-    bust = ts.bus
-
-    # Read XLSX with line capacities
-    DATALINES = PISP.read_xlsx_with_header(ispdata24, "Network Capability", "B6:H21")
-    Results = DataFrame(name = String[], busA = String[], busB = String[], idbusA = Int64[], idbusB = Int64[], fwd_peak = Float64[], fwd_summer = Float64[], fwd_winter = Float64[], rev_peak = Float64[], rev_summer = Float64[], rev_winter = Float64[])
-    # Link names
-    NEMTX = ["CQ->NQ", "CQ->GG", "SQ->CQ", "QNI North", "Terranora", "QNI South","CNSW->SNW North","CNSW->SNW South", "VNI North","VNI South","Heywood","SESA->CSA","Murraylink", "Basslink"]
-    # Link is Interconnector?
-    INT = [false, false, false, true, true, false, false, false, false, true, true, false, true, true]
-    NEMTYPE = ["DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC"]
-    #Build summary of capacities
-    for a in 2:nrow(DATALINES)
-        aux = []
-        nar = split(DATALINES[a,1]," "); 
-        length(nar) == 1 ? nar = split(DATALINES[a,1],"-") : nar = nar
-        if length(nar) > 2 deleteat!(nar, 2) end
-        bn1 = string(nar[1]); bn2 = string(nar[2]);
-        # NAME_LINK, BUS_FROM, BUS_TO, BUS_ID_FROM, BUS_ID_TO
-        aux = [string(bn1, "->", bn2), bn1, bn2, bust[bust[!,:name] .== bn1,:id_bus][1], bust[bust[!,:name] .== bn2,:id_bus][1]]
-        # Add columns 
-        for b in 2:ncol(DATALINES)
-            #FWD_PEAK, FWD_SUMMER, FWD_WINTER, REV_PEAK, REV_SUMMER, REV_WINTER
-            data = parse(Int64, replace(split(string(DATALINES[a, b]),['.', ' ', '\n'])[1], "," => ""))
-            append!(aux, data)
-        end
-        push!(Results, aux)
-    end
-
-    #Populate Line table
-    for a in 1:nrow(Results)
-        #ID, NAME, ALIAS, TECH, CAPACITY, BUS_ID_FROM, BUS_ID_TO, INVESTMENT, ACTIVE, R, X, TMIN, TMAX, VOLTAGE, SEGMENTS, LATITUDE, LONGITUDE, LENGTH, N, CONTINGENCY
-        maxcap = maximum([Results[a, :fwd_winter], Results[a, :rev_winter]])
-        vallin = (
-                id_lin     = a,
-                name        = Results[a, :name],
-                alias       = NEMTX[a],
-                tech        = NEMTYPE[a],
-                capacity    = maxcap,
-                id_bus_from = Results[a, :idbusA],
-                id_bus_to   = Results[a, :idbusB],
-                investment  = 0,
-                active      = true,
-                r           = 0.01,
-                x           = 0.1,
-                tmin        = Results[a, :rev_winter],
-                tmax        = Results[a, :fwd_winter],
-                voltage     = 220.0,
-                segments    = 1,
-                latitude    = "",
-                longitude   = "",
-                length      = 1.0,
-                n           = 1,
-                contingency = 0
-            )
-            push!(ts.line, vallin)
-    end
-
-    # Manual register of Project EnergyConnect 
-    npln        = nrow(ts.line) 
-    maxidlin    = isempty(ts.line) ? 0 : maximum(ts.line.id_lin)
-
-    # Build the new row
-    new_line = (
-        id_lin      = maxidlin + 1,
-        name        = "SNSW->CSA",
-        alias       = "Project EnergyConnect",
-        tech        = "DC",
-        capacity    = 800,
-        id_bus_from = 8,
-        id_bus_to   = 11,
-        investment  = 0,
-        active      = 1,
-        r           = 0.01,
-        x           = 0.1,
-        tmin        = 800,
-        tmax        = 800,
-        voltage     = 220.0,
-        segments    = 1,
-        latitude    = "",
-        longitude   = "",
-        length      = 1.0,
-        n           = 1,
-        contingency = 0
-    )
-    push!(ts.line, new_line)
-
-    function insert_line_schedule!(df::DataFrame, line_id, scenario, date, capacity)
-        newrow = (
-            id       = nrow(df) + 1,
-            id_lin   = line_id,
-            scenario = scenario,
-            date     = date,
-            value    = capacity
-        )
-        push!(df, newrow)
-    end
-
-    # Project EnergyConnect Stage 1: 150MW in 2024
-    for s in 1:3
-        insert_line_schedule!(tv.line_tmax, 15, s, DateTime(2024, 7, 1), 150)
-        insert_line_schedule!(tv.line_tmin, 15, s, DateTime(2024, 7, 1), 150)
-    end
-
-    # Stage 2
-    for s in 1:3
-        insert_line_schedule!(tv.line_tmax, 15, s, DateTime(2026, 7, 1), 800)
-        insert_line_schedule!(tv.line_tmin, 15, s, DateTime(2026, 7, 1), 800)
-    end
-end
-# ============================================ #
-# ========= Line limits table parser ========= #
-# ============================================ #
-begin 
-    TXdata = Results # From the line table parser
-
-    wmonths = [4,5,6,7,8,9]     # Winter months
-    smonths = [10,11,12,1,2,3]  # Summer months
-    probs   = tc.problem        # Call problem table 
-
-    txd_max = maximum(tv.line_tmax.id) + 1
-    txd_min = maximum(tv.line_tmin.id) + 1
-    for txid in 1:nrow(TXdata)
-        for p in 1:nrow(probs)
-            scid = probs[p,:scenario][1]    # Scenario ID
-            dstart = probs[p,:dstart]       # Start date of a week
-            dend = probs[p,:dend]           # End date of a week
-            ys = Dates.year(dstart)         # Start year of a week
-            ds = Dates.day(dstart)          # Start day of a week
-            de = Dates.day(dend)            # End day of a week
-            ms = Dates.month(dstart)        # Start month of a week
-            me = Dates.month(dend)          # End month of a week
-
-            if ms in wmonths                # If starting month is in winter months
-                push!(tv.line_tmax, (id=txd_max, id_lin=txid, scenario=scid, date=DateTime(dstart), value=TXdata[txid,8]))
-                push!(tv.line_tmin, (id=txd_min, id_lin=txid, scenario=scid, date=DateTime(dstart), value=TXdata[txid,11]))
-            else
-                push!(tv.line_tmax, (id=txd_max, id_lin=txid, scenario=scid, date=DateTime(dstart), value=TXdata[txid,7]))
-                push!(tv.line_tmin, (id=txd_min, id_lin=txid, scenario=scid, date=DateTime(dstart), value=TXdata[txid,10]))
-            end
-            txd_max += 1
-            txd_min += 1
-
-            if (ms in wmonths && me in smonths) || (ms in smonths && me in wmonths)
-                @warn "Problem start month is in winter and end month is in summer, check written data."
-                if me in wmonths
-                    push!(tv.line_tmax, (id=txd, id_lin=txid, scenario=scid, date=DateTime(ys,me,1), value=TXdata[txid,8]))
-                    push!(tv.line_tmin, (id=txd, id_lin=txid, scenario=scid, date=DateTime(ys,me,1), value=TXdata[txid,11]))
-                else
-                    push!(tv.line_tmax, (id=txd, id_lin=txid, scenario=scid, date=DateTime(ys,me,1), value=TXdata[txid,7]))
-                    push!(tv.line_tmin, (id=txd, id_lin=txid, scenario=scid, date=DateTime(ys,me,1), value=TXdata[txid,10]))
-                end
-                txd_max += 1
-                txd_min += 1
-            end
-        end
-    end
-end
-# ============================================ #
-# ============= Line investments ============= #
-# ============================================ #
-begin
-    bust = ts.bus
-    maxidlin = isempty(ts.line) ? 0 : maximum(ts.line.id_lin)
-    DATALININV = PISP.read_xlsx_with_header(ispdata24, "Flow Path Augmentation options", "B11:N94")
-    skip = ["Option Name",""]
-    df = DataFrame(Option = String[], Direction = String[], Forward = Float64[], Reverse = Float64[], Cost = Float64[], LeadYears = Float64[])
-
-    Results = DataFrame(name = String[], busA = String[], busB = String[], idbusA = Int64[], idbusB = Int64[],fwd = Float64[], rev = Float64[], invcost = Float64[], lead = Float64[])
-    bn1 = ""; bn2 = "";
-    # Loop over every possible candidate line
-    for a in 1:nrow(DATALININV)
-        #Just select the options that are not MISSING or not are in SKIP (i.e, only real options)
-        if ismissing(DATALININV[a, 4]) || DATALININV[a, 4] in skip continue end
-        # Bus FROM -> TO of candidates.
-        if !ismissing(DATALININV[a, 6]) 
-            bn1 = split(string(DATALININV[a, 6]),[' '])[1]
-            bn2 = split(string(DATALININV[a, 6]),[' '])[3]
-        end
-        
-        # Modified the input data sheet for Augmentation options, project energyconnect goes from SNSW to SA
-        # println("line_cost -->", split(string(DATALININV[a, 9]),     ['(','\n']))
-        aux = [split(string(DATALININV[a,4]),['(','\n'])[1],
-            bn1,                                                                     # BUS_FROM_NAME
-                bn2,                                                                 # BUS_TO_NAME
-                bust[bust[!, :name] .== bn1,:id_bus][1],                                 # BUS_FROM_ID
-                bust[bust[!, :name] .== bn2,:id_bus][1],                                 # BUS_TO_ID
-                PISP.flow2num(split(string(DATALININV[a, 7]),    ['(','\n'])[1]),    # FWD POWER
-                PISP.flow2num(split(string(DATALININV[a, 8]),    ['(','\n'])[1]),    # REV POWER
-                PISP.inv2num(split(string(DATALININV[a, 9]),     ['(','\n'])),       # INDICATIVE_COST_ESTIMATE
-                PISP.lead2year(split(string(DATALININV[a, 13]),  ['(','\n'])[1])]    # LEAD TIME
-        push!(Results, aux)
-    end
-
-    #MODIFY INVESTMENT OPTIONS COST (The issue was resolved in function inv2num)
-    factive(x) = x in ["SQ-CQ Option 3", "NNSW–SQ Option 3"] ?  0 : 1 # Non-network options deactivated, no investment cost info
-    idx = 0
-    for a in 1:nrow(Results)
-        maxidlin+=1
-        idx+=1
-        # Element to add to table LINE
-        linename = string(strip(Results[a,1]))
-        invname = "NL_$(Results[a,4])$(Results[a,5])_INV$(idx)"
-
-        vline = [maxidlin, linename, invname, "DC", max(Results[a,6],Results[a,7]), Results[a,4], Results[a,5], factive(Results[a,1]), factive(Results[a,1]), 0.01, 0.1, Results[a,7], Results[a,6], 220, 1, "", "", 1, 1, 0]
-
-        push!(ts.line, vline)
-    end
-end
+PISP.problem_table(tc);
+PISP.bus_table(ts); 
+txdata = PISP.line_table(ts, tv, ispdata24);
+PISP.line_sched_table(tc, tv, txdata);
+line_invoptions(ts, ispdata24);
 # ============================================ #
 # ============== Generator data ============== #
 # ============================================ #
@@ -322,17 +68,13 @@ namedict = PISP.OrderedDict(zip(MAPPING[!,1], MAPPING2[!,1]))
 # ====================================== #
 # ==== General list of Power Plants ==== #
 # ====================================== #
-# GENS = load(ispdata24, "Maximum capacity!B8:D260") |> DataFrame 
 GENS = PISP.read_xlsx_with_header(ispdata24, "Maximum capacity", "B8:D260")
 GENS[!, :Generator] = [k == "Bogong / Mackay" ? "Bogong / MacKay" : k for k in GENS[!, :Generator]] # Fix for Bogong / Mackay
 GENS[!, :Generator] = [k == "Lincoln Gap Wind Farm - Stage 2" ? "Lincoln Gap Wind Farm - stage 2" : k for k in GENS[!, :Generator]] # Fix for Bogong / Mackay
 
-# COMGEN_MAXCAP = load(ispdata24, "Maximum capacity!F8:I35" ) |> DataFrame       # DATA OF COMMITED PROJECTS
 COMGEN_MAXCAP = PISP.read_xlsx_with_header(ispdata24, "Maximum capacity", "F8:I35")
-# ADVGEN_MAXCAP = load(ispdata24, "Maximum capacity!K8:N24" ) |> DataFrame       # DATA OF ANTICIPATED PROJECTS 2
 ADVGEN_MAXCAP = PISP.read_xlsx_with_header(ispdata24, "Maximum capacity", "K8:N24")
 
-# MAPPING3 = load(ispdata24, "Summary Mapping!B4:I680" ) |> DataFrame           # DATA OF ALL GENERATORS
 MAPPING3 = PISP.read_xlsx_with_header(ispdata24, "Summary Mapping", "B4:I680")
 MAPPING3 = MAPPING3[completecases(MAPPING3),:]                              # SELECT ONLY ROWS OF MAPPING3 WITHOUT MISSING VALUES
 rename!(MAPPING3, 1 => :Generator)                                          # Rename first column to "Generator" 
@@ -341,10 +83,6 @@ ngen = size(GENS, 1) # Number of existing generators
 GENS[!, Symbol("Commissioning date")] = [DateTime(2020) for k in 1:ngen]
 rename!(COMGEN_MAXCAP, [1,2,3,4] .=> names(GENS)) # Rename columns as columns in GENS
 rename!(ADVGEN_MAXCAP, [1,2,3,4] .=> names(GENS))
-
-# Convert float 64 to datetime for commissioning date column in COMGEN_MAXCAP and ADVGEN_MAXCAP
-# COMGEN_MAXCAP[!, Symbol("Commissioning date")] = [str2date(COMGEN_MAXCAP[k, Symbol("Commissioning date")]) for k in eachindex(COMGEN_MAXCAP[:,1])]
-# ADVGEN_MAXCAP[!, Symbol("Commissioning date")] = [str2date(ADVGEN_MAXCAP[k, Symbol("Commissioning date")]) for k in eachindex(ADVGEN_MAXCAP[:,1])]
 
 append!(GENS, COMGEN_MAXCAP) # Create a unique dataframe with existing, commited and anticipated projects 
 append!(GENS, ADVGEN_MAXCAP) # TOTAL = EXISTING + COMMITED + ANTICIPATED = 295 GENERATORS
@@ -370,25 +108,18 @@ XLSX.writetable("GENS.xlsx", Tables.columntable(GENS); sheetname="Generators", o
 # Units with unit commitment and ramping #
 # ====================================== #
 # Generation limits and stable levels for coal and gas generators
-# DATA_COALMSG = load(ispdata24, "Generation limits!B8:D52" ) |> DataFrame          # Limits of Coal generation (Minimum Stable Generation)
 DATA_COALMSG = PISP.read_xlsx_with_header(ispdata24, "Generation limits", "B8:D52")
-# DATA_GPGMSG = load(ispdata24, "GPG Min Stable Level!B9:E34") |> DataFrame         # Limits of Gas turbines (Minimum Stable Generation)
 DATA_GPGMSG = PISP.read_xlsx_with_header(ispdata24, "GPG Min Stable Level", "B9:E34")
 select!(DATA_GPGMSG, Not(Symbol("Technology Type")))
 
 # Minimum up times for different units
-# DATA_MINUP_UNITS = load(ispdata24, "Min Up&Down Times!B8:E25") |> DataFrame       # Min UP and DW - GAS UNITS 
 DATA_MINUP_UNITS = PISP.read_xlsx_with_header(ispdata24, "Min Up&Down Times", "B8:E25")
-# DATA_MINUP_UNITS19 = load(ispdata19, "Generation limits!O9:Q69") |> DataFrame
 DATA_MINUP_UNITS19 = PISP.read_xlsx_with_header(ispdata19, "Generation limits", "O9:Q69") # Min UP and DW - GAS+COAL UNITS (2019)
 select!(DATA_MINUP_UNITS, Not(Symbol("Technology Type")))
-# save("DATA_MINUP_UNITS19.xlsx", DATA_MINUP_UNITS19)
 XLSX.writetable("DATA_MINUP_UNITS19.xlsx", Tables.columntable(DATA_MINUP_UNITS19); sheetname="Generators19", overwrite=true)
 # Ramp rates for different units
-# UC = load(ispdata24, "Max Ramp Rates!B8:F72") |> DataFrame                        # Max ramp up and down of generators
 UC = PISP.read_xlsx_with_header(ispdata24, "Max Ramp Rates", "B8:F72")
 select!(UC, Not(Symbol("Technology Type")))
-# save("UC.xlsx", UC)
 XLSX.writetable("UC.xlsx", Tables.columntable(UC); sheetname="UC", overwrite=true)
 
 #DUID -> Dispatchable Unit Identifier
@@ -409,22 +140,18 @@ rename!(DATA_MINUP_UNITS19, [2,3] .=> [Symbol("DUID"),Symbol("MinUpTime")]);
 
 # DATA_COALMSG contains the minimum stable generation for coal and gas
 append!(DATA_COALMSG, DATA_GPGMSG)
-# save("DATA_COALGASMSG.xlsx", DATA_COALMSG)
 XLSX.writetable("DATA_COALGASMSG.xlsx", Tables.columntable(DATA_COALMSG); sheetname="CoalGasMSG", overwrite=true)
 
 # DATA_MINUP_UNITS contains the minimum up time for coal and gas units
 append!(DATA_MINUP_UNITS, DATA_MINUP_UNITS19)
-# save("DATA_MINUP_UNITS.xlsx", DATA_MINUP_UNITS)
 XLSX.writetable("DATA_MINUP_UNITS.xlsx", Tables.columntable(DATA_MINUP_UNITS); sheetname="MinUpUnits", overwrite=true)
 
 # JOIN UC (Ramp Rates) with DATA_COALMSG (Minimum Stable Generation)
 UC = outerjoin(UC, DATA_COALMSG,on = :DUID,makeunique=true)
-# save("UC1.xlsx", UC)
 XLSX.writetable("UC1.xlsx", Tables.columntable(UC); sheetname="UC1", overwrite=true)
 
 # JOIN UC with DATA_MINUP_UNITS (Minimum Up Time)
 UC = outerjoin(UC,DATA_MINUP_UNITS,on = :DUID,makeunique=true)
-# save("UC2.xlsx", UC)
 XLSX.writetable("UC2.xlsx", Tables.columntable(UC); sheetname="UC2", overwrite=true)
 # Delete rows that if the string in column DUID contains "LD" - Asociated with Lidell Station (decommissioned)
 UC = UC[.!occursin.("LD",UC[!,:DUID]),:]
@@ -440,7 +167,6 @@ filter!((row) -> !(row[1] == "Darling Downs" && row[2] == "DDPS1" && row[6] == 6
 filter!((row) -> !(row[1] == "Osborne" && row[2] == "OSB-AG" && row[6] == 6), UC)
 filter!((row) -> !(row[1] == "Pelican Point" && row[2] == "PPCCGT" && row[6] == 4), UC)
 filter!((row) -> !(row[1] == "Tamar Valley Combined Cycle" && row[2] == "TVCC201" && row[6] == 6), UC)
-# save("UC2__.xlsx", UC)
 XLSX.writetable("UC2__.xlsx", Tables.columntable(UC); sheetname="UC2__", overwrite=true)
 # ➡️➡️➡️➡️➡️➡️➡️➡️➡️➡️ CHECK IF THIS IS WORKING OK
 # this is the rename as per the DUIDs are in the Retirement sheet
@@ -458,7 +184,6 @@ DUIDar = Dict(      "CPSA_GT1"      => "CPSA",
                     "PPCCGTST"     => "PPCCGT",
                     "TVCC201_GT"    => "TVCC201")
 UC[!,:DUID] = [n in keys(DUIDar) ? DUIDar[n] : n for n in UC[!,:DUID]]
-# save("UC3.xlsx", UC)
 XLSX.writetable("UC3.xlsx", Tables.columntable(UC); sheetname="UC3", overwrite=true)
 
 # ====================================== #
@@ -478,23 +203,18 @@ UNITS[UNITS[!,:Generator] .== "Kogan Gas", :DUID] .= "Kogan Gas"
 UNITS[UNITS[!,:Generator] .== "SA Hydrogen Turbine", :DUID] .= "SA Hydrogen Turbine"
 
 select!(UNITS,Not(3))
-# save("RETIREMENTS.xlsx", UNITS)
 XLSX.writetable("RETIREMENTS.xlsx", Tables.columntable(UNITS); sheetname="Retirements", overwrite=true)
 
 # ====================================== #
 # ============= RELIABILITY ============ #
 # ====================================== #
-# RELIA     = load(ispdata24, "Generator Reliability Settings!B20:G28" ) |> DataFrame
 RELIA = PISP.read_xlsx_with_header(ispdata24, "Generator Reliability Settings", "B20:G28")
-# RELIANEW  = load(ispdata24, "Generator Reliability Settings!I20:N40" ) |> DataFrame
 RELIANEW = PISP.read_xlsx_with_header(ispdata24, "Generator Reliability Settings", "I20:N40")
 
 # ====================================== #
 # ========= GENERATION SUMMARY ========= #
 # ====================================== #
-# GENSUM = load(ispdata24, "Existing Gen Data Summary!B10:U319") |> DataFrame
 GENSUM = PISP.read_xlsx_with_header(ispdata24, "Existing Gen Data Summary", "B10:U319")
-# GENSUM_ADD = load(ispdata24, "Existing Gen Data Summary!B382:U397") |> DataFrame # ADDITIONAL PROJECTS
 GENSUM_ADD = PISP.read_xlsx_with_header(ispdata24, "Existing Gen Data Summary", "B382:U397")
 GENSUM = vcat(GENSUM, GENSUM_ADD)
 GENSUM = GENSUM[3:end,:]
@@ -507,7 +227,6 @@ GENSUM[!,:Generator] = [namedict[n] for n in GENSUM[!,:Generator]]
 GENSUM[!,:Generator] = [n == "Tallawarra B*" ? "Tallawarra B" : n for n in GENSUM[!,:Generator]]
 GENSUM[!,:Generator] = [n == "Bungala One Solar Farm" ? "Bungala one Solar Farm" : n for n in GENSUM[!,:Generator]]
 GENSUM[!,:Generator] = [n == "Devils Gate" ? "Devils gate" : n for n in GENSUM[!,:Generator]]
-# save("GENSUM.xlsx", GENSUM)
 XLSX.writetable("GENSUM.xlsx", Tables.columntable(GENSUM); sheetname="GENSUM", overwrite=true)
 # Filter CELLS OF GENSUM WHERE THE VALUE IS EQUAL TO Missing in any column
 # for r in eachrow(GENSUM)
@@ -515,12 +234,10 @@ XLSX.writetable("GENSUM.xlsx", Tables.columntable(GENSUM); sheetname="GENSUM", o
 # end
 
 FULL = outerjoin(UNITS, GENS, on = :Generator)
-# save("FULL.xlsx", FULL)
 XLSX.writetable("FULL.xlsx", Tables.columntable(FULL); sheetname="FULL", overwrite=true)
 
 FULL = outerjoin(FULL, UC, on = :DUID, matchmissing=:equal)
 rename!(FULL, Dict(:Region => :Area,  Symbol("Installed capacity (MW)") => :CAPACITY, Symbol("Generator Station") => :NAME))
-# save("FULL2.xlsx", FULL)
 XLSX.writetable("FULL2.xlsx", Tables.columntable(FULL); sheetname="FULL2", overwrite=true)
 
 FULL = outerjoin(FULL, GENSUM, on = :Generator, matchmissing=:equal, makeunique=true)
@@ -533,7 +250,6 @@ FULL[!,Symbol("Technology type")] = [ismissing(k) ? missing : k for k in FULL[!,
 FULL[!,Symbol("Fuel type")] = [ismissing(k) ? missing : k for k in FULL[!,Symbol("Fuel/technology type")]]
 FULL.Bus = [ismissing(k) ? missing : k for k in FULL[!,Symbol("ISP \nsub-region")]]
 FULL[!,Symbol("REZ location")] = [ismissing(k) ? missing : k for k in FULL[!,Symbol("REZ location_1")]]
-# save("FULL3.xlsx", FULL)
 XLSX.writetable("FULL3.xlsx", Tables.columntable(FULL); sheetname="FULL3", overwrite=true)
 
 for c in [:NAME,:Region,Symbol("Generator type"),Symbol("Regional build cost zone"),
@@ -542,7 +258,6 @@ FULL[!,:CAPACITY] = coalesce.(FULL[!,:CAPACITY], FULL[!,18]) # Assign maximum ca
 # remove rows with missing values in column Generator
 FULL = FULL[.!ismissing.(FULL[!,:Generator]),:]
 @warn("Deleted Steam Turbines from generator table due to missing information. CHECK!")
-# save("GENERATORS.xlsx", FULL)
 XLSX.writetable("GENERATORS.xlsx", Tables.columntable(FULL); sheetname="Generators", overwrite=true)
 
 # ====================================== #
@@ -571,11 +286,8 @@ VRET = FULL[vretunit,:]
 BESS = FULL[bessunit,:]
 SYNC = FULL[.!syncunit,:]
 
-# save("VRET.xlsx", VRET)
 XLSX.writetable("VRET.xlsx", Tables.columntable(VRET); sheetname="VRET", overwrite=true)
-# save("BESS.xlsx", BESS)
 XLSX.writetable("BESS.xlsx", Tables.columntable(BESS); sheetname="BESS", overwrite=true)
-# save("SYNC.xlsx", SYNC)
 XLSX.writetable("SYNC.xlsx", Tables.columntable(SYNC); sheetname="SYNC", overwrite=true)
 
 sort!(SYNC, [Symbol("Fuel type"), :Generator]) #sort table
@@ -592,7 +304,6 @@ end
 SYNC[!,:n] = nar
 SYNC2 = SYNC[selar,:]
 sort!(SYNC2, [Symbol("Fuel type"), :Generator])
-# save("SYNC3.xlsx", SYNC2)
 XLSX.writetable("SYNC3.xlsx", Tables.columntable(SYNC2); sheetname="SYNC3", overwrite=true)
 
 units = Dict(
@@ -728,7 +439,6 @@ for k in 1:length(SYNC3[!,:fuel])
 end
 
 SYNC3[!,:cap] = SYNC3[!,:CAPACITY] ./ SYNC3[!,:n]
-# save("SYNC4.xlsx", SYNC3)
 XLSX.writetable("SYNC4.xlsx", Tables.columntable(SYNC3); sheetname="SYNC4", overwrite=true)
 
 # ====================================== #
@@ -753,14 +463,11 @@ filteremi = .![n in [k+j for k in 1:length(EMI[!,:Generator]) for j in 0:2 if is
 EMI = EMI[filteremi,:]
 SYNC3 = leftjoin(SYNC3, EMI, on = :Generator)
 SYNC3[!,:Emissions] = [ismissing(e) ? 0.0 : e for e in SYNC3[!,:Emissions]]
-# save("SYNC5.xlsx", SYNC3)
 XLSX.writetable("SYNC5.xlsx", Tables.columntable(SYNC3); sheetname="SYNC5", overwrite=true)
 
 SYNC4 = SYNC3[.!(SYNC3[!,:tech] .== "Pumped-Storage"),:]
 PS = SYNC3[(SYNC3[!,:tech] .== "Pumped-Storage"),:]
-# save("SYNC6.xlsx", SYNC4)
 XLSX.writetable("SYNC6.xlsx", Tables.columntable(SYNC4); sheetname="SYNC6", overwrite=true)
-# save("PS.xlsx", PS)
 XLSX.writetable("PS.xlsx", Tables.columntable(PS); sheetname="PS", overwrite=true)
 
 # ====================================== #
@@ -830,7 +537,6 @@ partialout = [ismissing(k) ? 0.0 : k for k in partialout]
 derate = [ismissing(k) ? 0.0 : k for k in derate]
 
 GENERATORS[!,:forate] = ones(nrow(SYNC4)) .- (fullout  .+ partialout  .* (ones(nrow(SYNC4)) .- derate))
-# save("GENERATORS2.xlsx", GENERATORS)
 XLSX.writetable("GENERATORS2.xlsx", Tables.columntable(GENERATORS); sheetname="GENERATORS2", overwrite=true)
 
 GENERATORS[!,:bus_id] = SYNC4[!,:bus_id]
@@ -889,7 +595,7 @@ end
 # ====================================== #
 
 COMMITMENT = DataFrame(id = 1:nrow(SYNC4))
-COMMITMENT[!,:active] = Int64.([true for k in 1:nrow(SYNC4)])
+# COMMITMENT[!,:active] = Int64.([true for k in 1:nrow(SYNC4)])
 COMMITMENT[!,:gen_id] = 1:nrow(SYNC4)
 COMMITMENT[!,:down_time] = zeros(nrow(SYNC4))
 COMMITMENT[!,:up_time] = coalesce.(SYNC4[!,:MinUpTime], 0.0)
@@ -907,6 +613,11 @@ COMMITMENT[!,:shut_down_time] = zeros(nrow(SYNC4))
 @warn("No start up time for any generator")
 @warn("No shut down time for any generator")
 
+# MERGE GENERATOR AND COMMITMENT IN left `id` and right `gen_id`. Fill missing values in COMMITMENT with 0
+merged = leftjoin(GENERATORS, COMMITMENT, on = [:id => :gen_id], makeunique=true)
+select!(merged, Not(:id_1))
+XLSX.writetable("GENERATORS_FULL.xlsx", Tables.columntable(merged); sheetname="GENERATORS", overwrite=true)
+
 # DBInterface.execute(socketSYS, "CREATE TABLE IF NOT EXISTS Generator_commitment($(PSO.strsql(MOD_GEN_COMMIT)))")
 # stmt_commit = DBInterface.prepare(socketSYS, "INSERT INTO Generator_commitment VALUES ($(qm(length(MOD_GEN_COMMIT))));")
 
@@ -914,4 +625,4 @@ COMMITMENT[!,:shut_down_time] = zeros(nrow(SYNC4))
 # for k in 1:nrow(COMMITMENT) DBInterface.execute(stmt_commit, collect(COMMITMENT[k,:])) end
 # @info "\n✓ GENERATOR \n✓ GENERATOR_COMMITMENT"
 
-return SYNC3, SYNC4, GENERATORS, BESS, PS
+# return SYNC3, SYNC4, GENERATORS, BESS, PS

@@ -93,23 +93,32 @@ MOD_GEN = OrderedDict{String, String}(
                                         "latitude"          => "REAL NOT NULL",
                                         "longitude"         => "REAL NOT NULL",
                                         "n"                 => "INTEGER NOT NULL",
-                                        "contingency"       => "BOOLEAN NOT NULL"
+                                        "contingency"       => "BOOLEAN NOT NULL",
+                                        "down_time"         => "REAL NOT NULL",
+                                        "up_time"           => "REAL NOT NULL",
+                                        "last_state"        => "REAL NOT NULL",
+                                        "last_state_period" => "REAL NOT NULL",
+                                        "last_state_output" => "REAL NOT NULL",
+                                        "start_up_cost"     => "REAL NOT NULL",
+                                        "shut_down_cost"    => "REAL NOT NULL",
+                                        "start_up_time"     => "REAL NOT NULL",
+                                        "shut_down_time"    => "REAL NOT NULL",
                                         )
 # Generator commitment
-MOD_GEN_COMMIT = OrderedDict{String, String}(  
-                                                "id"                => "INTEGER PRIMARY KEY", 
-                                                "active"            => "BOOLEAN NOT NULL",
-                                                "id_gen"            => "INTEGER REFERENCES Generator (id_gen)",
-                                                "down_time"         => "REAL NOT NULL",
-                                                "up_time"           => "REAL NOT NULL",
-                                                "last_state"        => "REAL NOT NULL",
-                                                "last_state_period" => "REAL NOT NULL",
-                                                "last_state_output" => "REAL NOT NULL",
-                                                "start_up_cost"     => "REAL NOT NULL",
-                                                "shut_down_cost"    => "REAL NOT NULL",
-                                                "start_up_time"     => "REAL NOT NULL",
-                                                "shut_down_time"    => "REAL NOT NULL",
-                                        )
+# MOD_GEN_COMMIT = OrderedDict{String, String}(  
+#                                                 "id"                => "INTEGER PRIMARY KEY", 
+#                                                 "active"            => "BOOLEAN NOT NULL",
+#                                                 "id_gen"            => "INTEGER REFERENCES Generator (id_gen)",
+#                                                 "down_time"         => "REAL NOT NULL",
+#                                                 "up_time"           => "REAL NOT NULL",
+#                                                 "last_state"        => "REAL NOT NULL",
+#                                                 "last_state_period" => "REAL NOT NULL",
+#                                                 "last_state_output" => "REAL NOT NULL",
+#                                                 "start_up_cost"     => "REAL NOT NULL",
+#                                                 "shut_down_cost"    => "REAL NOT NULL",
+#                                                 "start_up_time"     => "REAL NOT NULL",
+#                                                 "shut_down_time"    => "REAL NOT NULL",
+#                                         )
 # Line
 MOD_LINE = OrderedDict{String, String}(  
                                         "id_lin"            => "INTEGER PRIMARY KEY", 
@@ -139,6 +148,5 @@ TABLES_POWERSYSTEM = OrderedDict(
                                         "Demand"                    => MOD_DEMAND,
                                         "ESS"                       => MOD_ESS,
                                         "Generator"                 => MOD_GEN,
-                                        "Generator_commitment"      => MOD_GEN_COMMIT,
                                         "Line"                      => MOD_LINE,
                                     )

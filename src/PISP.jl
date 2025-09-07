@@ -8,6 +8,7 @@ module PISP
     include("PISPutils.jl")
     include("PISPparameters.jl")
     include("PISPstructures.jl")
+    include("PISPparsers.jl")
     export DataFrames
     export PISPtimeStatic, PISPtimeVarying, PISPtimeConfig
 end
