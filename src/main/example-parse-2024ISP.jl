@@ -102,4 +102,3 @@ PISP.PISPwritedataCSV(tv, "out/schedule-1w-new")    # Time-varying data (schedul
 # Arrow format
 PISP.PISPwritedataArrow(ts, "out-arrow")                    # Time-static data
 PISP.PISPwritedataArrow(tv, "out-arrow/schedule-1w-new")    # Time-varying data (schedules)
-

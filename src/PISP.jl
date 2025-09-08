@@ -9,7 +9,6 @@ module PISP
 
     include("PISPdatamodel.jl")
     include("PISPstructures.jl")
-    export PISPtimeStatic, PISPtimeVarying, PISPtimeConfig # Export structures to store the generated data
     include("PISPutils.jl")
     include("PISPparameters.jl")
     include("PISPparsers.jl")
