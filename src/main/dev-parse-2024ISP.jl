@@ -17,7 +17,7 @@ outlookdata = "/Users/papablaza/Library/CloudStorage/OneDrive-TheUniversityofMel
 outlookAEMO = "/Users/papablaza/Library/CloudStorage/OneDrive-TheUniversityofMelbourne/Modelling/ISP24/CapacityOutlook/CapacityOutlook_2024_ISP_melted_CDP14.xlsx";
 vpp_cap     = "/Users/papablaza/Library/CloudStorage/OneDrive-TheUniversityofMelbourne/Modelling/ISP24/CapacityOutlook/Storage/StorageOutlook_Capacity.xlsx";
 vpp_ene     = "/Users/papablaza/Library/CloudStorage/OneDrive-TheUniversityofMelbourne/Modelling/ISP24/CapacityOutlook/Storage/StorageOutlook_Energy.xlsx";
-dsp_data    = "/Users/papablaza/Library/CloudStorage/OneDrive-TheUniversityofMelbourne/Modelling/ISP24/CapacityOutlook/2024ISP_DSP.xlsx";
+dsp_data    = "/Users/papablaza/Library/CloudStorage/OneDrive-TheUniversityofMelbourne/Modelling/ISP24/CapacityOutlook/2024ISP_DSP.xlsx"
 
 # ================================================ #
 #  Define dates and scenarios for data collection  #
@@ -96,13 +96,3 @@ PISP.ess_vpps(tc, ts, tv, vpp_cap, vpp_ene);
 
 PISP.der_tables(ts);
 PISP.der_pred_sched(ts, tv, dsp_data);
-# ============================================ #
-# Write dataframes in CSV and Arrow formats 
-# ============================================ #
-# CSV format
-PISP.PISPwritedataCSV(ts, "out")                    # Time-static data
-PISP.PISPwritedataCSV(tv, "out/schedule-1w-new")    # Time-varying data (schedules)
-
-# Arrow format
-PISP.PISPwritedataArrow(ts, "out-arrow")                    # Time-static data
-PISP.PISPwritedataArrow(tv, "out-arrow/schedule-1w-new")    # Time-varying data (schedules)
