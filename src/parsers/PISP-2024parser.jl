@@ -9,10 +9,17 @@ end
 function line_table(ts::PISPtimeStatic, tv::PISPtimeVarying, ispdata24::String)
     bust = ts.bus
     # Read XLSX with line capacities
-    DATALINES = PISP.read_xlsx_with_header(ispdata24, "Network Capability", "B6:H21")
+    DATALINES   = PISP.read_xlsx_with_header(ispdata24, "Network Capability", "B6:H21")
+    RELIALINES  = PISP.read_xlsx_with_header(ispdata24, "Transmission Reliability", "B7:G11")
     Results = DataFrame(name = String[], busA = String[], busB = String[], idbusA = Int64[], idbusB = Int64[], fwd_peak = Float64[], fwd_summer = Float64[], fwd_winter = Float64[], rev_peak = Float64[], rev_summer = Float64[], rev_winter = Float64[])
     # Link names
     NEMTX = ["CQ->NQ", "CQ->GG", "SQ->CQ", "QNI North", "Terranora", "QNI South","CNSW->SNW North","CNSW->SNW South", "VNI North","VNI South","Heywood","SESA->CSA","Murraylink", "Basslink"]
+    RELIAMAP = Dict(NEMTX[11] => RELIALINES[1,:], # Heywood
+                NEMTX[13] => RELIALINES[2,:], # Murraylink
+                NEMTX[14] => RELIALINES[3,:], # Basslink
+                NEMTX[4]  => RELIALINES[4,:], # QNI North
+                NEMTX[6]  => RELIALINES[5,:]  # QNI South
+            )
     # Link is Interconnector?
     INT = [false, false, false, true, true, false, false, false, false, true, true, false, true, true]
     NEMTYPE = ["DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC", "DC"]
@@ -38,6 +45,7 @@ function line_table(ts::PISPtimeStatic, tv::PISPtimeVarying, ispdata24::String)
     for a in 1:nrow(Results)
         #ID, NAME, ALIAS, TECH, CAPACITY, BUS_ID_FROM, BUS_ID_TO, INVESTMENT, ACTIVE, R, X, TMIN, TMAX, VOLTAGE, SEGMENTS, LATITUDE, LONGITUDE, LENGTH, N, CONTINGENCY
         maxcap = maximum([Results[a, :fwd_winter], Results[a, :rev_winter]])
+        alias = NEMTX[a]
         vallin = (
                 id_lin     = a,
                 name        = Results[a, :name],
@@ -52,6 +60,8 @@ function line_table(ts::PISPtimeStatic, tv::PISPtimeVarying, ispdata24::String)
                 x           = 0.1,
                 tmin        = Results[a, :rev_winter],
                 tmax        = Results[a, :fwd_winter],
+                fullout     = haskey(RELIAMAP, alias) ? RELIAMAP[alias][3] : 0, # reliability values for interconnectors that have data available
+                mttrfull    = haskey(RELIAMAP, alias) ? RELIAMAP[alias][5] : 1, 
                 voltage     = 220.0,
                 segments    = 1,
                 latitude    = "",
