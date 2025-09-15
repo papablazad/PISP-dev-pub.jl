@@ -92,6 +92,8 @@ function line_table(ts::PISPtimeStatic, tv::PISPtimeVarying, ispdata24::String)
         x           = 0.1,
         tmin        = 800,
         tmax        = 800,
+        fullout     = 0, # reliability values for interconnectors that have data available
+        mttrfull    = 1, 
         voltage     = 220.0,
         segments    = 1,
         latitude    = "",
@@ -214,7 +216,7 @@ function line_invoptions(ts::PISPtimeStatic, ispdata24::String)
         linename = string(strip(Results[a,1]))
         invname = "NL_$(Results[a,4])$(Results[a,5])_INV$(idx)"
 
-        vline = [maxidlin, linename, invname, "DC", max(Results[a,6],Results[a,7]), Results[a,4], Results[a,5], factive(Results[a,1]), factive(Results[a,1]), 0.01, 0.1, Results[a,7], Results[a,6], 220, 1, "", "", 1, 1, 0]
+        vline = [maxidlin, linename, invname, "DC", max(Results[a,6],Results[a,7]), Results[a,4], Results[a,5], factive(Results[a,1]), factive(Results[a,1]), 0.01, 0.1, Results[a,7], Results[a,6], 0, 1, 220, 1, "", "", 1, 1, 0]
 
         push!(ts.line, vline)
     end
@@ -682,6 +684,17 @@ function generator_table(ts::PISPtimeStatic, ispdata19::String, ispdata24::Strin
             GENERATORS[r,:pmin] = round(0.2 * GENERATORS[r,:pmax], digits=2)
         end
     end
+    
+    # Manual fix for Murray
+    if any(GENERATORS[!,:name] .== "Murray 1")
+        r = findfirst(GENERATORS[!,:name] .== "Murray 1")
+        GENERATORS[r,:alias] = "MURRAY1"
+    end
+
+    if any(GENERATORS[!,:name] .== "Murray 2")
+        r = findfirst(GENERATORS[!,:name] .== "Murray 2")
+        GENERATORS[r,:alias] = "MURRAY2"
+    end
 
     # @warn("Pmin for CCGT is set to 52% of Pmax")
     # @warn("Pmin for OCGT is set to 33% of Pmax")
@@ -821,10 +834,10 @@ function ess_tables(ts::PISPtimeStatic, tv::PISPtimeVarying, PSESS::DataFrame, i
     BESS_FOR[!,:pmax] = BESS[!,Symbol("Installed capacity (MW)")] 
     BESS_FOR[!,:lmin] = [ 0.0 for k in 1:nrow(BESS)]
     BESS_FOR[!,:lmax] = BESS[!,Symbol("Installed capacity (MW)")]
-    BESS_FOR[!,:fullout] = [RELIANEW[8,2] for k in 1:nrow(BESS)]
+    BESS_FOR[!,:fullout] = [RELIANEW[8,2]/100 for k in 1:nrow(BESS)]
     BESS_FOR[!,:partialout] = [0 for k in 1:nrow(BESS)]
     BESS_FOR[!,:mttrfull] = [RELIANEW[8,4] for k in 1:nrow(BESS)]
-    BESS_FOR[!,:mttrpart] = [0 for k in 1:nrow(BESS)]
+    BESS_FOR[!,:mttrpart] = [1.0 for k in 1:nrow(BESS)]
     BESS_FOR[!,:inertia] = [ 0.0 for k in 1:nrow(BESS)]
     BESS_FOR[!,:powerfactor] = [ 1.0 for k in 1:nrow(BESS)]
     BESS_FOR[!,:ffr] = [ 1 for k in 1:nrow(BESS)]
@@ -860,10 +873,10 @@ function ess_tables(ts::PISPtimeStatic, tv::PISPtimeVarying, PSESS::DataFrame, i
     PS_FOR[!,:pmax] = [ PISP.dataps[k][3] for k in PSESS[!,:Generator] ]
     PS_FOR[!,:lmin] = [ 0.0 for k in PSESS[!,:Generator] ]
     PS_FOR[!,:lmax] = [ PISP.dataps[k][4] for k in PSESS[!,:Generator] ]
-    PS_FOR[!,:fullout] = [RELIANEW[15,2] for k in 1:nrow(PSESS)]
+    PS_FOR[!,:fullout] = [RELIANEW[15,2]/100 for k in 1:nrow(PSESS)]
     PS_FOR[!,:partialout] = [0 for k in 1:nrow(PSESS)]
     PS_FOR[!,:mttrfull] = [RELIANEW[15,4] for k in 1:nrow(PSESS)]
-    PS_FOR[!,:mttrpart] = [0 for k in 1:nrow(PSESS)]
+    PS_FOR[!,:mttrpart] = [1.0 for k in 1:nrow(PSESS)]
     PS_FOR[!,:inertia] = [ 2.2 for k in PSESS[!,:Generator] ]
     PS_FOR[!,:powerfactor] = [ 0.85 for k in 1:nrow(PSESS)]
     PS_FOR[!,:ffr] = [ 0 for k in 1:nrow(PSESS)]
@@ -926,7 +939,7 @@ function gen_pmax_distpv(tc::PISPtimeConfig, ts::PISPtimeStatic, tv::PISPtimeVar
         bus_id = bus_data[!, :id_bus][1]
         bus_lat = bus_data[!, :latitude][1]
         bus_lon = bus_data[!, :longitude][1]
-        arrgen = [gid,"RTPV_$(st)","RTPV_$(st)","Solar","RoofPV","RoofPV", 100.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, bus_id, 0.0, 100.0, 9999.9, 9999.9, 0, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 0, 1.0, bus_lat, bus_lon, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        arrgen = [gid,"RTPV_$(st)","RTPV_$(st)","Solar","RoofPV","RoofPV", 100.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, bus_id, 0.0, 100.0, 9999.9, 9999.9, 0, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 0, 1.0, bus_lat, bus_lon, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         push!(ts.gen, arrgen)
         for p in 1:nrow(probs)
             scid = probs[p,:scenario][1]
@@ -1398,7 +1411,7 @@ function ess_vpps(tc::PISPtimeConfig, ts::PISPtimeStatic, tv::PISPtimeVarying, v
         data_cap = VPPCAP[VPPCAP[!,:bus] .== st, Symbol("$(yr)-$(string(yr+1)[3:end])")][1]
         data_ene = VPPENE[VPPENE[!,:bus] .== st, Symbol("$(yr)-$(string(yr+1)[3:end])")][1]*1000
         BMBESSid[st] = [bmid, data_cap, data_ene]
-        arrbmss = [bmid,"VPP_CER_$(st)","VPP_CER_$(st)","BESS","SHALLOW", data_cap, 0, 1, bus_id, 0.9, 0.9, 10.0, 10.0, data_ene, 0.0, data_cap, 0.0, data_cap, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, PISP.NEMBUSES[st][2], PISP.NEMBUSES[st][1], 1, 0]
+        arrbmss = [bmid,"VPP_CER_$(st)","VPP_CER_$(st)","BESS","SHALLOW", data_cap, 0, 1, bus_id, 0.9, 0.9, 10.0, 10.0, data_ene, 0.0, data_cap, 0.0, data_cap, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, PISP.NEMBUSES[st][2], PISP.NEMBUSES[st][1], 1, 0]
         push!(ts.ess, arrbmss)
     end
 
