@@ -138,10 +138,24 @@ MOD_LINE = OrderedDict{String, String}(
                                         "contingency"       => "BOOLEAN NOT NULL",
                                         )
 
-TABLES_POWERSYSTEM = OrderedDict(   
-                                        "Bus"                       => MOD_BUS,
-                                        "Demand"                    => MOD_DEMAND,
-                                        "ESS"                       => MOD_ESS,
-                                        "Generator"                 => MOD_GEN,
-                                        "Line"                      => MOD_LINE,
+MOD_DER = OrderedDict{String, String}(  "id_der"            => "INTEGER PRIMARY KEY", 
+                                        "name"              => "VARCHAR(225) NOT NULL",
+                                        "tech"              => "VARCHAR(225) NOT NULL",
+                                        "id_dem"            => "INTEGER NOT NULL",
+                                        "active"            => "BOOLEAN NOT NULL",
+                                        "investment"        => "BOOLEAN NOT NULL",
+                                        "capacity"          => "REAL NOT NULL",
+                                        "reduct"            => "BOOLEAN NOT NULL",
+                                        "pred_max"          => "REAL NOT NULL",
+                                        "cost_red"          => "REAL NOT NULL",
+                                        "n"                 => "INTEGER NOT NULL",
+                                        )
+
+TABLES_POWERSYSTEM = OrderedDict{String, OrderedDict{String, String}}(   
+                                                    "Bus"                       => MOD_BUS,
+                                                    "Demand"                    => MOD_DEMAND,
+                                                    "ESS"                       => MOD_ESS,
+                                                    "Generator"                 => MOD_GEN,
+                                                    "Line"                      => MOD_LINE,
+                                                    "DER"                       => MOD_DER,
                                     )
