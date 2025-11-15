@@ -17,3 +17,4 @@ test/
 test-*/
 !data-updated/
 !data-updated/**
+*.zip

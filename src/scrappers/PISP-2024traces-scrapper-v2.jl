@@ -3,6 +3,7 @@ using Gumbo
 using Cascadia
 using Downloads
 using Printf
+using Gumbo: HTMLText
 
 const PAGE_URL = "https://www.aemo.com.au/energy-systems/major-publications/integrated-system-plan-isp/2024-integrated-system-plan-isp"
 const OUTDIR   = "scrapped/ISP_2024_traces" 
@@ -18,14 +19,11 @@ end
 println("Fetching page:\n  $PAGE_URL")
 resp = HTTP.get(PAGE_URL; headers = ["User-Agent" => "JuliaISPDownloader/1.0"])
 html = String(resp.body)
-# println("Parsing HTML…")
+
 parsed = parsehtml(html)
-# All <a> inside <div class="field-link">
+
 selector = Selector("div.field-link a")
 anchors = collect(eachmatch(selector, parsed.root))
-
-# println("Found $(length(anchors)) <a> elements under div.field-link")
-
 
 struct TraceLink
     text::String
@@ -34,7 +32,6 @@ end
 
 trace_links = TraceLink[]
 
-using Gumbo: HTMLText
 
 function inner_html(node)
     io = IOBuffer()
@@ -114,8 +111,54 @@ end
 
 # === MAIN LOOP ================================================================
 
-# Assumes `trace_links` is an iterable of objects with fields `.href` and `.text`
-# e.g., from a HTML parser.
+function ask_yes_no(prompt::AbstractString; default::Bool = false)
+    suffix = default ? " [Y/n]: " : " [y/N]: "
+    while true
+        print(prompt, suffix)
+        flush(stdout)
+        resp = try
+            readline()
+        catch err
+            err isa EOFError && return default
+            rethrow(err)
+        end
+        resp = lowercase(strip(resp))
+        if isempty(resp)
+            return default
+        elseif resp in ("y", "yes")
+            return true
+        elseif resp in ("n", "no")
+            return false
+        else
+            println("    Please answer 'y' or 'n'.")
+        end
+    end
+end
+
+function confirm_overwrite(path::AbstractString)
+    println("⚠️  File already exists: $(path) \n")
+    return ask_yes_no("Replace it?"; default = false)
+end
+
+function confirm_skip_existing()
+    println("⚠️  Multiple files have been kept so far.")
+    return ask_yes_no("Skip replacing any existing files for the rest of this run?"; default = false)
+end
+
+# Clear any stray newline left in the REPL buffer before the first prompt.
+function drain_pending_stdin()
+    isatty(stdin) || return
+    try
+        while bytesavailable(stdin) > 0
+            read(stdin, UInt8)
+        end
+    catch
+        # best effort only — ignore terminals that do not support bytesavailable
+    end
+end
+
+
+# drain_pending_stdin()
 
 for (i, tl) in enumerate(trace_links)
     # Safely handle possible `nothing` in text
@@ -140,7 +183,32 @@ for (i, tl) in enumerate(trace_links)
     println("[$i/$(length(trace_links))] Downloading:")
     println("  Text : ", tl.text)
     println("  URL  : ", tl.href)
-    println("  File : ", dest)
+    println("  File : ", dest, "\n")
+
+    if isfile(dest)
+        if skip_existing
+            println("  ↺ Skipping (global no-replace enabled).\n")
+            push!(filenames, filename)
+            continue
+        end
+
+        if !confirm_overwrite(dest)
+            nonreplace_count += 1
+            if nonreplace_count > 2 && !skip_prompted
+                skip_existing = confirm_skip_existing()
+                skip_prompted = true
+                if skip_existing
+                    println("  ↺ Global no-replace enabled. Existing files will be kept.\n")
+                    push!(filenames, filename)
+                    continue
+                end
+            end
+
+            println("  ↺ Skipping (keeping existing file).\n")
+            push!(filenames, filename)
+            continue
+        end
+    end
 
     try
         download_AEMO(String(tl.href), dest)
@@ -149,6 +217,80 @@ for (i, tl) in enumerate(trace_links)
         @warn "  ❌ Failed to download $(tl.href)" exception = e
     end
 
+    push!(filenames, filename)
+
     # Optional: small delay to be gentle with the server
     # sleep(0.5)
 end
+
+function test_downloads()
+    filenames = String[];
+    skip_existing = false;
+    skip_prompted = false;
+    nonreplace_count = 0;
+
+    for (i, tl) in enumerate(trace_links)
+        # Safely handle possible `nothing` in text
+        raw_text = isnothing(tl.text) ? "" : String(tl.text)
+
+        # Prefer the anchor text (e.g. "ISP Wind Traces r2019.zip") for the filename.
+        # If empty, fall back to the last part of the URL.
+        base =
+            !isempty(raw_text) ? raw_text :
+            split(String(tl.href), "/")[end]
+
+        base = sanitize_filename(base)
+
+        # Ensure .zip extension (defensive, even though text usually has it)
+        if !endswith(lowercase(base), ".zip")
+            base *= ".zip"
+        end
+
+        filename = @sprintf("%02d_%s", i, base)
+        dest = joinpath(OUTDIR, filename)
+
+        println("[$i/$(length(trace_links))] Downloading:")
+        println("  Text : ", tl.text)
+        println("  URL  : ", tl.href)
+        println("  File : ", dest, "\n")
+
+        if isfile(dest)
+            if skip_existing
+                println("  ↺ Skipping (global no-replace enabled).\n")
+                push!(filenames, filename)
+                continue
+            end
+
+            if !confirm_overwrite(dest)
+                nonreplace_count += 1
+                if nonreplace_count > 2 && !skip_prompted
+                    skip_existing = confirm_skip_existing()
+                    skip_prompted = true
+                    if skip_existing
+                        println("  ↺ Global no-replace enabled. Existing files will be kept.\n")
+                        push!(filenames, filename)
+                        continue
+                    end
+                end
+
+                println("  ↺ Skipping (keeping existing file).\n")
+                push!(filenames, filename)
+                continue
+            end
+        end
+
+        try
+            download_AEMO(String(tl.href), dest)
+            println("  ✅ Done\n")
+        catch e
+            @warn "  ❌ Failed to download $(tl.href)" exception = e
+        end
+
+        push!(filenames, filename)
+
+        # Optional: small delay to be gentle with the server
+        # sleep(0.5)
+    end
+end
+
+test_downloads()
