@@ -988,7 +988,7 @@ function dem_load(tc::PISPtimeConfig, ts::PISPtimeStatic, tv::PISPtimeVarying, p
         bus_data = bust[bust[!,:name] .== st, :]
         bus_id = bus_data[!, :id_bus][1]
 
-        arrdem = [did,"DEM_$(st)", 100.0, bus_id, 1, 0, 17500.0, 1]
+        arrdem = [did,"DEM_$(st)", 0.0, bus_id, 1, 1, 17500.0, 1]
         push!(ts.dem, arrdem)
         for p in 1:nrow(probs)
             scid = probs[p,:scenario][1]
@@ -1453,16 +1453,16 @@ function der_tables(ts::PISPtimeStatic)
     # ============================================ #
     # DSP table development  ===================== #
     # ============================================ #
-    dem = ts.dem
-    maxiddem = isempty(dem) ? 1 : maximum(dem.id_dem) + 1
-    cdem_dsp = Dict()
-    for row in eachrow(dem)
-        cdem_name = replace(row["name"], "DEM"=>"DSP")
-        row_cdem = (maxiddem, cdem_name, 0, row["id_bus"], 1, 1 ,17500, 1)
-        push!(ts.dem, row_cdem)
-        cdem_dsp[cdem_name] = maxiddem
-        maxiddem += 1
-    end
+    # dem = ts.dem
+    # maxiddem = isempty(dem) ? 1 : maximum(dem.id_dem) + 1
+    # cdem_dsp = Dict()
+    # for row in eachrow(dem)
+    #     cdem_name = replace(row["name"], "DEM"=>"DSP")
+    #     row_cdem = (maxiddem, cdem_name, 0, row["id_bus"], 1, 1 ,17500, 1)
+    #     push!(ts.dem, row_cdem)
+    #     cdem_dsp[cdem_name] = maxiddem
+    #     maxiddem += 1
+    # end
     # ======================================== #
     # DSP VALUES
     # ======================================== #
@@ -1475,7 +1475,7 @@ function der_tables(ts::PISPtimeStatic)
 
     for row in eachrow(cont_dem)
         for band in 1:bands
-            dem_name = row["name"]*"_BAND$band"
+            dem_name = row["name"]*"_DSP_BAND$band"
             id_dem   = row["id_dem"]
             row_der = [ deridx,             # ID_DER
                         dem_name,           # NAME
