@@ -4,14 +4,17 @@ using PISP.ISPFileDownloader
 using PISP.PISPScrapperUtils
 
 throttle_env = get(ENV, "ISP_DOWNLOAD_THROTTLE", "")
-traces_options = FileDownloadOptions(outdir            = normpath(@__DIR__, "..", "..", "downloads", "traces"),
-                            confirm_overwrite = true,
-                            skip_existing     = false,
-                            throttle_seconds  = isempty(throttle_env) ? nothing : parse(Float64, throttle_env));
+traces_options = FileDownloadOptions(outdir            = normpath(@__DIR__, "..", "..", "data-new", "traces"),
+                        confirm_overwrite = true,
+                        skip_existing     = false,
+                        throttle_seconds  = isempty(throttle_env) ? nothing : parse(Float64, throttle_env));
 
+files_options = FileDownloadOptions(outdir = normpath(@__DIR__, "..", "..", "data-new"),
+                        confirm_overwrite = false,
+                        skip_existing     = true);
 
-isp24_workbook  = download_isp24_inputs_workbook(options = FileDownloadOptions(outdir = "downloads/ISP-files", confirm_overwrite = false, skip_existing = true)) # 2024 IASR workbook
-isp19_workbook  = download_isp19_inputs_workbook(options = FileDownloadOptions(outdir = "downloads/ISP-files", confirm_overwrite = false, skip_existing = true)) # 2019 IASR workbook
-isp24_model     = download_isp24_model_archive(options   = FileDownloadOptions(outdir = "downloads/ISP-files", confirm_overwrite = false, skip_existing = true)) # PLEXOS model
-isp24_outlook   = download_isp24_outlook(options         = FileDownloadOptions(outdir = "downloads/ISP-files", confirm_overwrite = false, skip_existing = true)) # Generation and Storage Outlook
-isp24_traces    = download_isp24_traces(options          = traces_options)
+downloaded_files  = download_all_isp_files(options = files_options)
+downloaded_traces = download_isp24_traces(options = traces_options)
+
+println("Downloaded $(length(downloaded_files)) ISP reference files to $(files_options.outdir)")
+println("Downloaded $(length(downloaded_traces)) ISP trace archives to $(traces_options.outdir)")
