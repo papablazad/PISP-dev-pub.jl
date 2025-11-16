@@ -20,12 +20,12 @@ files_options_zip = FileDownloadOptions(outdir = normpath(@__DIR__, "..", "..", 
 isp24_inputs_path       = download_isp24_inputs_workbook(options = files_options)
 isp19_inputs_path       = download_isp19_inputs_workbook(options = files_options)
 isp24_model_path        = download_isp24_model_archive(options = files_options_zip)
-isp24_gen_storage_path  = download_isp24_generation_storage_archive(options = files_options_zip)
+isp24_outlook_path      = download_isp24_outlook(options = files_options_zip)
 
 downloaded_files = [
     isp24_inputs_path,
     isp24_model_path,
-    isp24_gen_storage_path,
+    isp24_outlook_path,
     isp19_inputs_path,
 ]
 downloaded_traces = download_isp24_traces(options = traces_options)
