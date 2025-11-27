@@ -1650,11 +1650,15 @@ function der_tables(ts::PISPtimeStatic)
     dem       = ts.dem
     cont_dem  = dem[dem[!, :controllable] .== 1,:]
     deridx    = isempty(der) ? 1 : maximum(der.id_der) + 1
-    cost_band = [300, 500, 1000, 7500] # 4 cost bands as modelled in the ISP24
+    cost_band = Dict(1 => 300,
+                     2 => 500,
+                     3 => 1000,
+                     4 => 7500,
+                     "RR" => 41480,) # Reliability Response (Based on the value of customer reliability VCR: https://www.aer.gov.au/industry/registers/resources/reviews/values-customer-reliability-2024 )
     bands     = length(cost_band)
 
     for row in eachrow(cont_dem)
-        for band in 1:bands
+        for band in push!(Any[collect(1:4)...], "RR")#collect(1:bands)
             dem_name = row["name"]*"_DSP_BAND$band"
             id_dem   = row["id_dem"]
             row_der = [ deridx,             # ID_DER
@@ -1663,9 +1667,9 @@ function der_tables(ts::PISPtimeStatic)
                         id_dem,             # ID_DEMAND
                         1,                  # ACTIVE
                         0,                  # INVESTMENT
-                        100,                # CAPACITY
+                        0,                  # CAPACITY
                         1,                  # REDUCT
-                        10,                 # PRED_MAX
+                        0,                  # PRED_MAX
                         cost_band[band],    # COST_RED
                         1,]                 # N
             push!(ts.der, row_der)
@@ -1723,7 +1727,7 @@ function der_pred_sched(ts::PISPtimeStatic, tv::PISPtimeVarying, dsp_data::Strin
         PISP.inputDB_dsp(tv, QLD_WIN, der_ids, scenario, perc)
 
         # ++ SQ
-        perc = 1.0
+        perc = 1.0 # Total assigned to SQ
         der_ids = ts.der[occursin.("SQ", ts.der[!, :name]), :].id_der
         PISP.inputDB_dsp(tv, QLD_SUM, der_ids, scenario, perc)
         PISP.inputDB_dsp(tv, QLD_WIN, der_ids, scenario, perc)
@@ -1743,7 +1747,7 @@ function der_pred_sched(ts::PISPtimeStatic, tv::PISPtimeVarying, dsp_data::Strin
         PISP.inputDB_dsp(tv, NSW_WIN, der_ids, scenario, perc)
 
         # ++ SNW
-        perc = 1.0
+        perc = 1.0 # Total assigned to Sydney, Newcastle and Wollongong
         der_ids = ts.der[occursin.("SNW", ts.der[!, :name]), :].id_der
         PISP.inputDB_dsp(tv, NSW_SUM, der_ids, scenario, perc)
         PISP.inputDB_dsp(tv, NSW_WIN, der_ids, scenario, perc)
@@ -1755,12 +1759,14 @@ function der_pred_sched(ts::PISPtimeStatic, tv::PISPtimeVarying, dsp_data::Strin
         PISP.inputDB_dsp(tv, NSW_WIN, der_ids, scenario, perc)
         # ======================================== #
         # VIC
+        perc = 1.0 # Total assigned to VIC
         der_ids = ts.der[occursin.("VIC", ts.der[!, :name]), :].id_der
         PISP.inputDB_dsp(tv, VIC_SUM, der_ids, scenario, perc)
         PISP.inputDB_dsp(tv, VIC_WIN, der_ids, scenario, perc)
 
         # ======================================== #
         # TAS
+        perc = 1.0 # Total assigned to TAS
         der_ids = ts.der[occursin.("TAS", ts.der[!, :name]), :].id_der
         PISP.inputDB_dsp(tv, TAS_SUM, der_ids, scenario, perc)
         PISP.inputDB_dsp(tv, TAS_WIN, der_ids, scenario, perc)

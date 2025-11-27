@@ -26,8 +26,8 @@ interval spans financial years.
   receives the generated rows.
 """
 function fill_problem_example(tc::PISPtimeConfig)
-    start_date = DateTime(2025, 1, 1, 0, 0, 0)
-    step_ = Day(7)
+    start_date = DateTime(2030, 1, 1, 0, 0, 0)
+    step_ = Day(120)
     nblocks = 3
     date_blocks = PISP.OrderedDict()
     ref_year = 2025
