@@ -122,30 +122,37 @@ output_melted_path = normpath(outlook_auxiliary_path, "CapacityOutlook2024_Conde
 CSV.write(output_melted_path, df_melted)
 
 # ================================================ #
-# Storage outlook capacity
+# Storage energy and capacity outlook
 # ================================================ #
-datapath               = normpath(@__DIR__, "..", "..", "data-download")
-outlook_core_path      = normpath(datapath,"2024-isp-generation-and-storage-outlook/Core")
-outlook_auxiliary_path = normpath(datapath,"2024-isp-generation-and-storage-outlook/Auxiliary")
-mkpath(outlook_auxiliary_path)
-file_list       = readdir(outlook_core_path)
-all_capacities  = DataFrame[]
+# modify code here
+storage_energy_dfs   = DataFrame[]
+storage_capacity_dfs = DataFrame[]
 for f in file_list
     if endswith(f, ".xlsx")
-        file_path       = normpath(outlook_core_path, f)
-        parts           = split(f, " - ")
-        scenario_full   = length(parts) >= 2 ? strip(parts[2]) : ""
-        capacity_df     = PISP.read_xlsx_with_header(file_path, "Storage Capacity", "A3:AG5000")
+        file_path     = normpath(outlook_core_path, f)
+        parts         = split(f, " - ")
+        scenario_full = length(parts) >= 2 ? strip(parts[2]) : ""
+
+        energy_df = PISP.read_xlsx_with_header(file_path, "Storage Energy", "A3:AG5000")
+        insertcols!(energy_df, 2, :Scenario => fill(scenario_full, nrow(energy_df)))
+        energy_df = filter(row -> any(x -> x isa Number && !ismissing(x), row), energy_df)
+        push!(storage_energy_dfs, energy_df)
+
+        capacity_df = PISP.read_xlsx_with_header(file_path, "Storage Capacity", "A3:AG5000")
         insertcols!(capacity_df, 2, :Scenario => fill(scenario_full, nrow(capacity_df)))
-        capacity_df     = filter(row -> any(x -> x isa Number && !ismissing(x), row), capacity_df)
-        push!(all_capacities, capacity_df)
+        capacity_df = filter(row -> any(x -> x isa Number && !ismissing(x), row), capacity_df)
+        push!(storage_capacity_dfs, capacity_df)
     end
 end
-combined_capacity_df = isempty(all_capacities) ? DataFrame() : vcat(all_capacities...; cols = :union)
-combined_csv_path    = normpath(outlook_auxiliary_path, "CapacityOutlook_2024_ISP.csv")
-CSV.write(combined_csv_path, combined_capacity_df)
 
+combined_energy_df   = isempty(storage_energy_dfs) ? DataFrame() : vcat(storage_energy_dfs...; cols = :union)
+combined_capacity_df = isempty(storage_capacity_dfs) ? DataFrame() : vcat(storage_capacity_dfs...; cols = :union)
 
-vpp_cap     = normpath(datapath, "CapacityOutlook/Storage/StorageOutlook_Capacity.xlsx")
-vpp_ene     = normpath(datapath, "CapacityOutlook/Storage/StorageOutlook_Energy.xlsx")
-dsp_data    = normpath(datapath, "CapacityOutlook/2024ISP_DSP.xlsx")
+storage_energy_path   = normpath(outlook_auxiliary_path, "StorageEnergyOutlook_2024_ISP.csv")
+storage_capacity_path = normpath(outlook_auxiliary_path, "StorageCapacityOutlook_2024_ISP.csv")
+CSV.write(storage_energy_path, combined_energy_df)
+CSV.write(storage_capacity_path, combined_capacity_df)
+
+# vpp_cap     = normpath(datapath, "CapacityOutlook/Storage/StorageOutlook_Capacity.xlsx")
+# vpp_ene     = normpath(datapath, "CapacityOutlook/Storage/StorageOutlook_Energy.xlsx")
+dsp_data    = normpath(datapath, "CapacityOutlook/2024ISP_DSP.xlsx") #This should be directly taken from the ISP data
