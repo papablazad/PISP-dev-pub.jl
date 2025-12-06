@@ -79,6 +79,11 @@ HYDROSCE = OrderedDict(
                 "Step Change"           => "StepChange",
                 "Green Energy Exports"  => "HydrogenSuperpower")
 
+DEMSCE = OrderedDict(
+                "Progressive Change"    => "PROGRESSIVE_CHANGE",
+                "Step Change"           => "STEP_CHANGE",
+                "Green Energy Exports"  => "HYDROGEN_EXPORT")
+
 # Weather years mapping for ISP 2024 trace 4006 (Optimal development path). 
 # Date mapping based on https://aemo.com.au/-/media/files/major-publications/isp/2024/supporting-materials/2024-isp-plexos-model-instructions.pdf?la=en
 WEATHER_YEARS_ISP = Dict(
