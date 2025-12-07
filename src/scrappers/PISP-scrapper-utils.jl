@@ -132,10 +132,8 @@ module PISPScrapperUtils
 
         extracted_paths = String[]
         for zip_path in zip_files
-            base = splitext(basename(zip_path))[1]
-            target_dir = joinpath(abs_dest_root, base)
-            extract_zip(zip_path, target_dir; kwargs...)
-            push!(extracted_paths, target_dir)
+            extract_zip(zip_path, abs_dest_root; kwargs...)
+            push!(extracted_paths, abs_dest_root)
         end
 
         return extracted_paths
