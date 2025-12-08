@@ -52,11 +52,12 @@ STATIC_PARAMS = PISP.populate_time_static!(tc, ts, tv, data_paths, refyear=reftr
 PISP.populate_time_varying!(tc, ts, tv, data_paths, STATIC_PARAMS, refyear=reftrace, poe=poe);
 
 # 4. Export results to CSV and Arrow for downstream tools.
+output_name = "out"
 PISP.write_time_data(ts, tv;
-    csv_static_path     = "out-ref$(reftrace)-poe$(poe)/csv",
-    csv_varying_path    = "out-ref$(reftrace)-poe$(poe)/csv/schedule-$(year)",
-    arrow_static_path   = "out-ref$(reftrace)-poe$(poe)/arrow",
-    arrow_varying_path  = "out-ref$(reftrace)-poe$(poe)/arrow/schedule-$(year)",
+    csv_static_path     = "$(output_name)-ref$(reftrace)-poe$(poe)/csv",
+    csv_varying_path    = "$(output_name)-ref$(reftrace)-poe$(poe)/csv/schedule-$(year)",
+    arrow_static_path   = "$(output_name)-ref$(reftrace)-poe$(poe)/arrow",
+    arrow_varying_path  = "$(output_name)-ref$(reftrace)-poe$(poe)/arrow/schedule-$(year)",
     write_static        = true,
     write_varying       = true,
 )
