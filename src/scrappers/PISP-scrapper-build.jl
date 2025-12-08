@@ -86,7 +86,7 @@ module ISPdatabuilder
     """
     function download_isp_assets(; data_root::AbstractString = DEFAULT_DATA_ROOT,
                                 confirm_overwrite::Bool = true,
-                                skip_existing::Bool = false,
+                                skip_existing::Bool = true,
                                 throttle_seconds::Union{Nothing,Real} = nothing)
         dirs = data_dirs(data_root)
         traces_options = FileDownloadOptions(outdir = dirs.trace_zip_root,
@@ -410,7 +410,7 @@ module ISPdatabuilder
     """
     function build_pipeline(; data_root::AbstractString = DEFAULT_DATA_ROOT,
                         confirm_overwrite::Bool = true,
-                        skip_existing::Bool = false,
+                        skip_existing::Bool = true,
                         throttle_seconds::Union{Nothing,Real} = nothing,
                         overwrite_extracts::Bool = true,
                         quiet_extracts::Bool = true,

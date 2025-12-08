@@ -116,7 +116,7 @@ module ISPFileDownloader
 
             if isfile(dest)
                 if skip_existing
-                    println("  ↺ Skipping (global no-replace enabled).\n")
+                    println("  ↺ Skipping file download (global no-replace enabled).\n")
                     push!(saved_paths, dest)
                     continue
                 elseif options.confirm_overwrite && !overwrite_policy(dest)

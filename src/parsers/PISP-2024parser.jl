@@ -1104,12 +1104,9 @@ directory are written into `tv.dem_sched` for each period defined in `tc`.
 - `tv::PISPtimeVarying`: Receives chronological demand schedules.
 - `profilespath::String`: Root folder containing demand trace files.
 """
-function dem_load(tc::PISPtimeConfig, ts::PISPtimeStatic, tv::PISPtimeVarying, profilespath::String; refyear::Int64=2011, poe::Int64=10)
-    probs = tc.problem
-    bust = ts.bus
-
+function dem_load(ts::PISPtimeStatic)
+    bust  = ts.bus
     did     = isempty(ts.dem.id_dem) ? 0 : maximum(ts.dem.id_dem)
-    lmaxid  = isempty(tv.dem_load.id) ? 0 : maximum(tv.dem_load.id)
 
     for st in keys(PISP.NEMBUSNAME)
         did += 1
@@ -1118,6 +1115,28 @@ function dem_load(tc::PISPtimeConfig, ts::PISPtimeStatic, tv::PISPtimeVarying, p
 
         arrdem = [did,"DEM_$(st)", 0.0, bus_id, 1, 1, 17500.0, 1]
         push!(ts.dem, arrdem)
+    end
+end
+
+"""
+    dem_load_sched(tc, ts, tv, profilespath)
+
+Populate both static demand tables. Scenario-specific load traces derived from the profile
+directory are written into `tv.dem_sched` for each period defined in `tc`.
+
+# Arguments
+- `tc::PISPtimeConfig`: Specifies schedule windows to generate.
+- `ts::PISPtimeStatic`: Receives regional demand descriptors.
+- `tv::PISPtimeVarying`: Receives chronological demand schedules.
+- `profilespath::String`: Root folder containing demand trace files.
+"""
+function dem_load_sched(tc::PISPtimeConfig, tv::PISPtimeVarying, profilespath::String; refyear::Int64=2011, poe::Int64=10)
+    probs = tc.problem
+    did     = 0 # Demands counter
+    lmaxid  = isempty(tv.dem_load.id) ? 0 : maximum(tv.dem_load.id)
+
+    for st in keys(PISP.NEMBUSNAME)
+        did += 1
         for p in 1:nrow(probs)
             scid = probs[p,:scenario][1]
             sc = PISP.ID2SCE[scid]

@@ -97,10 +97,9 @@ for later steps).
   (currently exposing the `SYNC4`, `GENERATORS`, and `PS` tables) that are
   required by the time-varying stage.
 """
-function populate_time_static!(tc::PISPtimeConfig, ts::PISPtimeStatic, tv::PISPtimeVarying, paths::NamedTuple; refyear::Int64=2011, poe::Int64=10)
-    @info "Populating time-static data for ISP 2024 - referece weather trace $(refyear) ..."
+function populate_time_static!(ts::PISPtimeStatic, tv::PISPtimeVarying, paths::NamedTuple; refyear::Int64=2011, poe::Int64=10)
     PISP.bus_table(ts)
-    PISP.dem_load(tc, ts, tv, paths.profiledata; refyear=refyear, poe=poe)
+    PISP.dem_load(ts)
 
     txdata = PISP.line_table(ts, tv, paths.ispdata24)
     PISP.line_invoptions(ts, paths.ispdata24)
@@ -138,10 +137,9 @@ derived without recomputing inputs.
 """
 function populate_time_varying!(tc::PISPtimeConfig, ts::PISPtimeStatic, tv::PISPtimeVarying,
         paths::NamedTuple, static_artifacts::NamedTuple; refyear::Int64=2011, poe::Int64=10)
-    @info "Populating time-varying data for ISP 2024 - referece weather trace $(refyear) ..."
     txdata = static_artifacts.txdata
     generator_tables = static_artifacts.generator_tables
-
+    PISP.dem_load_sched(tc, tv, paths.profiledata; refyear=refyear, poe=poe)
     PISP.line_sched_table(tc, tv, txdata)
     PISP.gen_n_sched_table(tv, generator_tables.SYNC4, generator_tables.GENERATORS)
     PISP.gen_retirements(ts, tv)
@@ -182,16 +180,18 @@ function write_time_data(
         write_static::Bool  = true,
         write_varying::Bool = true,
         output_root::Union{Nothing,AbstractString} = nothing,
+        write_csv::Bool = true,
+        write_arrow::Bool = true
 )
     to_path(p) = isnothing(output_root) ? p : normpath(output_root, p)
 
     if write_static
-        PISP.PISPwritedataCSV(ts, to_path(csv_static_path))
-        PISP.PISPwritedataArrow(ts, to_path(arrow_static_path))
+        if write_csv PISP.PISPwritedataCSV(ts, to_path(csv_static_path)) end
+        if write_arrow PISP.PISPwritedataArrow(ts, to_path(arrow_static_path)) end
     end
 
     if write_varying
-        PISP.PISPwritedataCSV(tv, to_path(csv_varying_path))
-        PISP.PISPwritedataArrow(tv, to_path(arrow_varying_path))
+        if write_csv PISP.PISPwritedataCSV(tv, to_path(csv_varying_path)) end
+        if write_arrow PISP.PISPwritedataArrow(tv, to_path(arrow_varying_path)) end
     end
 end
