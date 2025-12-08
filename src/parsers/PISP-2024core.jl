@@ -181,14 +181,17 @@ function write_time_data(
         arrow_varying_path::AbstractString  = "test-hydro/out-hydro-arrow/schedule-1w-new",
         write_static::Bool  = true,
         write_varying::Bool = true,
+        output_root::Union{Nothing,AbstractString} = nothing,
 )
+    to_path(p) = isnothing(output_root) ? p : normpath(output_root, p)
+
     if write_static
-        PISP.PISPwritedataCSV(ts, csv_static_path)
-        PISP.PISPwritedataArrow(ts, arrow_static_path)
+        PISP.PISPwritedataCSV(ts, to_path(csv_static_path))
+        PISP.PISPwritedataArrow(ts, to_path(arrow_static_path))
     end
 
     if write_varying
-        PISP.PISPwritedataCSV(tv, csv_varying_path)
-        PISP.PISPwritedataArrow(tv, arrow_varying_path)
+        PISP.PISPwritedataCSV(tv, to_path(csv_varying_path))
+        PISP.PISPwritedataArrow(tv, to_path(arrow_varying_path))
     end
-end 
+end

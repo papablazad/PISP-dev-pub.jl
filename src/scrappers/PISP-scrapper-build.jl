@@ -305,6 +305,13 @@ module ISPdatabuilder
 
         output_paths = String[]
         for cleaned_file_name in cleaned_file_names
+            output_path = joinpath(output_dir, "$(cleaned_file_name)_RefYear4006.csv")
+            if isfile(output_path)
+                verbose && @info "Skipping existing 4006 trace" path = output_path
+                push!(output_paths, output_path)
+                continue
+            end
+
             verbose && @info cleaned_file_name
             tech_traces = Dict(year => process_traces(joinpath(tech_dir, "$(tech)_$(year)", "$(cleaned_file_name)_RefYear$(year).csv")) for year in years)
             filtered_frames = DataFrame[]
@@ -317,7 +324,6 @@ module ISPdatabuilder
             if "date" in names(df_out)
                 select!(df_out, Not("date"))
             end
-            output_path = joinpath(output_dir, "$(cleaned_file_name)_RefYear4006.csv")
             CSV.write(output_path, df_out)
             push!(output_paths, output_path)
         end
@@ -346,6 +352,13 @@ module ISPdatabuilder
         output_paths = String[]
 
         for dt in dem_types
+            output_path = joinpath(output_dir, "$(region)_RefYear_4006_$(PISP.DEMSCE[scenario])_POE$(poe_int)_$(dt).csv")
+            if isfile(output_path)
+                verbose && @info "Skipping existing 4006 demand trace" path = output_path
+                push!(output_paths, output_path)
+                continue
+            end
+
             tech_traces = Dict{Int,DataFrame}(y => process_traces(joinpath(base_dir, "$(base_name(y))_$(dt).csv")) for y in years)
             filtered_frames = DataFrame[]
             for (start_date, end_date, ref_year) in DATE_RANGES_REFYEARS
@@ -355,7 +368,6 @@ module ISPdatabuilder
             end
             df_out = vcat(filtered_frames...; cols = :union)
             select!(df_out, Not("date"))
-            output_path = joinpath(output_dir, "$(region)_RefYear_4006_$(PISP.DEMSCE[scenario])_POE$(poe_int)_$(dt).csv")
             CSV.write(output_path, df_out)
             push!(output_paths, output_path)
         end
