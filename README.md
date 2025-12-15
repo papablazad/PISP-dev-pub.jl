@@ -1,4 +1,4 @@
-# PISP.jl: Julia parser for the Integrated System Plan
+# PISP.jl: Julia parser of the Integrated System Plan
 
 [![Build Status](https://github.com/papablazad/PISP.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/papablazad/PISP.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/papablazad/PISP.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/papablazad/PISP.jl)
@@ -16,9 +16,9 @@ Dataset construction in PISP is performed through a single high-level function, 
 using PISP
 
 # Set some of the input parameters (see all parameters below)
-reference_trace = 4006 
-poe = 10 # Probability of exceedance (POE) for demand
-target_years = [2030, 2031]
+reference_trace = 4006         # Reference weather trace. 4006 is the one of the Optimal Development Path (ODP) of the ISP
+poe             = 10           # Probability of exceedance (POE) for demand
+target_years    = [2030, 2031] # Planning years for which to generate datasets
 
 PISP.build_ISP24_datasets(
     downloadpath = joinpath(@__DIR__, "..", "data", "pisp-downloads"),
