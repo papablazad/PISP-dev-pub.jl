@@ -1,10 +1,17 @@
 using DataFrames
 using Dates
+using OrderedCollections
 using XLSX
+using PISP
 
 ev_workbook_path = "/Users/papablaza/git/ARPST-CSIRO-STAGE-5/PISP-dev-pub.jl/data/PISP-downloads/2023-iasr-ev-workbook.xlsx"
 
 const BEV_PHEV_PROFILE_WEEKEND_SHEET = "BEV_PHEV_Profile_kW (Weekend)"
+const BEV_PHEV_PROFILE_WEEKDAY_SHEET = "BEV_PHEV_Profile_kW (Weekday)"
+
+include(joinpath(dirname(@__DIR__), "parameters", "general2024ISP.jl"))
+
+const STATE_CODE_BY_NAME = Dict(state_name => state_code for (state_code, state_name) in PISP.NEMAREAS)
 
 is_blank_cell(value) = ismissing(value) || (value isa AbstractString && isempty(strip(value)))
 
@@ -13,7 +20,11 @@ function is_blank_row(row)
 end
 
 function is_state_header_row(row)
-    return !is_blank_cell(row[1]) && all(is_blank_cell, row[2:end])
+    if is_blank_cell(row[1]) || !all(is_blank_cell, row[2:end])
+        return false
+    end
+
+    return haskey(STATE_CODE_BY_NAME, strip(String(row[1])))
 end
 
 function is_time_header_row(row)
@@ -32,7 +43,13 @@ function split_profile_label(label::AbstractString)
 end
 
 function time_column_name(value::Time)
-    return Symbol("time_" * Dates.format(value, "HH_MM"))
+    return Symbol(Dates.format(value, "HH_MM"))
+end
+
+function map_state_name_to_code(state_name::AbstractString)
+    state_code = get(STATE_CODE_BY_NAME, state_name, nothing)
+    state_code === nothing && error("State `$state_name` was not found in NEMAREAS.")
+    return state_code
 end
 
 function build_bev_phev_profile_dataframe(workbook_path::AbstractString, sheet_name::AbstractString; day_type::AbstractString)
@@ -43,17 +60,17 @@ function build_bev_phev_profile_dataframe(workbook_path::AbstractString, sheet_n
     profile_time_indices = Int[]
     profile_time_columns = Symbol[]
 
-    column_order = Symbol[:day_type, :state, :vehicle_class, :charging_profile]
+    column_order = Symbol[:vehicle_class, :charging_profile, :state, :day_type]
     columns = Dict{Symbol, Vector}(
-        :day_type => String[],
-        :state => String[],
         :vehicle_class => String[],
         :charging_profile => String[],
+        :state => String[],
+        :day_type => String[],
     )
 
     for row in non_empty_rows
         if is_state_header_row(row)
-            current_state = String(strip(row[1]))
+            current_state = map_state_name_to_code(String(strip(row[1])))
             continue
         end
 
@@ -82,10 +99,10 @@ function build_bev_phev_profile_dataframe(workbook_path::AbstractString, sheet_n
         label = strip(String(row[1]))
         vehicle_class, charging_profile = split_profile_label(label)
 
-        push!(columns[:day_type], day_type)
-        push!(columns[:state], current_state)
         push!(columns[:vehicle_class], vehicle_class)
         push!(columns[:charging_profile], charging_profile)
+        push!(columns[:state], current_state)
+        push!(columns[:day_type], day_type)
 
         for (relative_index, time_column) in zip(profile_time_indices, profile_time_columns)
             value = row[relative_index + 1]
@@ -102,7 +119,11 @@ bev_phev_profile_weekend_df = build_bev_phev_profile_dataframe(
     day_type = "Weekend",
 )
 
-# Read and process sheet `BEV_PHEV_Profile_kW (Weekday)`
+bev_phev_profile_weekday_df = build_bev_phev_profile_dataframe(
+    ev_workbook_path,
+    BEV_PHEV_PROFILE_WEEKDAY_SHEET;
+    day_type = "Weekday",
+)
 
 # Read and process `Numbers` (x4)
 
