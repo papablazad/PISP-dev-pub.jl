@@ -100,14 +100,16 @@ module ISPdatabuilder
                             confirm_overwrite = confirm_overwrite,
                             skip_existing = skip_existing)
 
-        isp24_inputs_path  = download_isp24_inputs_workbook(options = files_options)
-        isp19_inputs_path  = download_isp19_inputs_workbook(options = files_options)
-        isp24_model_path   = download_isp24_model_archive(options   = files_options_zip)
-        isp24_outlook_path = download_isp24_outlook(options         = files_options_zip)
-        downloaded_traces  = download_isp24_traces(options = traces_options)
+        isp24_inputs_path      = download_isp24_inputs_workbook(options = files_options)
+        iasr23_ev_workbook_path = download_iasr23_ev_workbook(options = files_options)
+        isp19_inputs_path      = download_isp19_inputs_workbook(options = files_options)
+        isp24_model_path       = download_isp24_model_archive(options   = files_options_zip)
+        isp24_outlook_path     = download_isp24_outlook(options         = files_options_zip)
+        downloaded_traces      = download_isp24_traces(options = traces_options)
 
         downloaded_files = [
             isp24_inputs_path,
+            iasr23_ev_workbook_path,
             isp24_model_path,
             isp24_outlook_path,
             isp19_inputs_path,
@@ -117,6 +119,7 @@ module ISPdatabuilder
         @info("Downloaded $(length(downloaded_traces)) ISP trace files to $(traces_options.outdir)")
 
         return (files = downloaded_files,
+                iasr23_ev_workbook = iasr23_ev_workbook_path,
                 traces = downloaded_traces,
                 options = (files = files_options,
                            zip_files = files_options_zip,
