@@ -3,11 +3,10 @@ using DataFrames
 using Dates
 
 #%%
-
 # Comments about the data
 #      - The names in "BHV_PHEV_Profile_kW" dont exactly match the names in "BEV_PHEV_Charge_Type". Need to make adjustments: 
-#         - Split both up into type and charging mode       
-#         - Remove additional " - vehicle charging" in "BHV_PHEV_Profile_kW"
+#      - Split both up into type and charging mode       
+#      - Remove additional " - vehicle charging" in "BHV_PHEV_Profile_kW"
 #      - Create additional mapping dict:
 car_type_mapping = Dict(
     "Articulated Truck"       => "Buses and Trucks",
@@ -23,54 +22,45 @@ car_type_mapping = Dict(
 )
 
 #%%
-
-
-
-#%%
-
-scenario = 2
+scenario    = 2
 target_year = 2030
-
 exclude_charging = [] # "Convenience Charging", "Daytime Charging", "Highway Fast Charging", "Nighttime Charging", "Vehicle to Grid", "Vehicle to Home"
-
-
 #%%
-
 # Read in the data
-profiles = CSV.read("_personal scripts/DER/data/EVprofiles.csv", DataFrame)
-shares = CSV.read("_personal scripts/DER/data/EVshares.csv", DataFrame)
-numbers = CSV.read("_personal scripts/DER/data/EVnumbers.csv", DataFrame)
+profiles    = CSV.read("_personal scripts/DER/data/EVprofiles.csv", DataFrame)
+shares      = CSV.read("_personal scripts/DER/data/EVshares.csv", DataFrame)
+numbers     = CSV.read("_personal scripts/DER/data/EVnumbers.csv", DataFrame)
 subregional = CSV.read("_personal scripts/DER/data/EVsubregional.csv", DataFrame)
 
 # Creating relevant datetime vectors
-start_dt = DateTime("$(target_year)-01-01 00:00:00", dateformat"yyyy-mm-dd HH:MM:SS")
-profile_times = [start_dt + Minute(30*(i-1)) for i in 1:48]
+start_dt             = DateTime("$(target_year)-01-01 00:00:00", dateformat"yyyy-mm-dd HH:MM:SS")
+profile_times        = [start_dt + Minute(30*(i-1)) for i in 1:48]
 profile_column_names = ["$(Dates.format(t, dateformat"H:MM"))" for t in profile_times]
 
 # Filter the data for the relevant scenario and year
-numbers = filter(row -> row.scenario == scenario && row.year == target_year, numbers)
-shares = filter(row -> row.scenario == scenario && row.year == target_year, shares)
+numbers     = filter(row -> row.scenario == scenario && row.year == target_year, numbers)
+shares      = filter(row -> row.scenario == scenario && row.year == target_year, shares)
 subregional = filter(row -> row.scenario == scenario && row.year == target_year, subregional)
 
 # Combine the data into one dataframe
-profiles = leftjoin(profiles, numbers, on=["state", "type"])
+profiles          = leftjoin(profiles, numbers, on=["state", "type"])
 profiles.category = [car_type_mapping[string(t)] for t in profiles.type]
-profiles = leftjoin(profiles, shares[:, [:state, :category, :charging, :share]], on=["state", "category", "charging"])
+profiles          = leftjoin(profiles, shares[:, [:state, :category, :charging, :share]], on=["state", "category", "charging"])
 
 # Remove excluded charging types
 profiles = filter(row -> !(row.charging in exclude_charging), profiles)
 
 # Calculate the number of BEVs and PHEVs for each profile
-profiles.numberBEV = profiles.numberBEV .* profiles.share
-profiles.numberPHEV = profiles.numberPHEV .* profiles.share
+profiles.numberBEV    = profiles.numberBEV .* profiles.share
+profiles.numberPHEV   = profiles.numberPHEV .* profiles.share
 profiles.total_number = profiles.numberBEV .+ profiles.numberPHEV
 
 # And then calculate the total load for each profile
 idxs_weekday = findall(profiles.day .== "weekday")
 idxs_weekend = findall(profiles.day .== "weekend")
-total_profiles_weekday = profiles[idxs_weekday, profile_column_names] .* profiles.total_number[idxs_weekday]
+total_profiles_weekday       = profiles[idxs_weekday, profile_column_names] .* profiles.total_number[idxs_weekday]
 total_profiles_weekday.state = profiles.state[idxs_weekday]
-total_profiles_weekend = profiles[idxs_weekend, profile_column_names] .* profiles.total_number[idxs_weekend]
+total_profiles_weekend       = profiles[idxs_weekend, profile_column_names] .* profiles.total_number[idxs_weekend]
 total_profiles_weekend.state = profiles.state[idxs_weekend]
 
 # Then aggregate to get hourly profiles for each state
