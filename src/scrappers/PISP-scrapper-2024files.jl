@@ -12,6 +12,7 @@ module ISPFileDownloader
         download_isp_files,
         download_all_isp_files,
         download_isp24_inputs_workbook,
+        download_iasr23_ev_workbook,
         download_isp24_model_archive,
         download_isp24_generation_storage_archive,
         download_isp24_outlook,
@@ -54,6 +55,11 @@ module ISPFileDownloader
                       "https://www.aemo.com.au/-/media/files/major-publications/isp/2024/2024-isp-inputs-and-assumptions-workbook.xlsx?rev=c75116cf5a834eeaa6b4ed68cff9b117&sc_lang=en";
                       filename = "2024-isp-inputs-and-assumptions-workbook.xlsx",
                       subdir = ""),
+        ISPFileTarget(:iasr23_ev_workbook,
+                      "2023 IASR EV workbook",
+                      "https://www.aemo.com.au/-/media/files/major-publications/isp/2023/2023-iasr-ev-workbook.xlsx";
+                      filename = "2023-iasr-ev-workbook.xlsx",
+                      subdir = ""),
         ISPFileTarget(:isp24_model,
                       "2024 ISP Model",
                       "https://www.aemo.com.au/-/media/files/major-publications/isp/2024/supporting-materials/2024-isp-model.zip?rev=3b35a0a57f564ec88098985782d2932c&sc_lang=en";
@@ -81,6 +87,9 @@ module ISPFileDownloader
 
     download_isp24_inputs_workbook(; options::FileDownloadOptions = default_file_download_options()) =
         download_single_target(:isp24_inputs; options = options)
+
+    download_iasr23_ev_workbook(; options::FileDownloadOptions = default_file_download_options()) =
+        download_single_target(:iasr23_ev_workbook; options = options)
 
     download_isp24_model_archive(; options::FileDownloadOptions = default_file_download_options()) =
         download_single_target(:isp24_model; options = options)
