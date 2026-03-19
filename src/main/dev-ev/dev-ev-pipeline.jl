@@ -22,6 +22,8 @@ for year in years
     PISP.populate_time_varying!(tc, ts, tv, data_paths, static_params; refyear = reftrace, poe = poe)
 end
 
+iasr23_ev_workbook
+
 # =============================== #
 
 ev_workbook_path   = "/Users/papablaza/git/ARPST-CSIRO-STAGE-5/PISP-dev-pub.jl/data/PISP-downloads/2023-iasr-ev-workbook.xlsx"
@@ -455,6 +457,29 @@ function melt_subregional_demand_allocation_dataframe(df::DataFrame)
     )
 end
 
+function format_ev_profile_year(date_value::TimeType)
+    current_year = year(date_value)
+
+    if month(date_value) <= 6
+        return "$(current_year - 1)_$(lpad(string(mod(current_year, 100)), 2, '0'))"
+    end
+
+    return "$(current_year)_$(lpad(string(mod(current_year + 1, 100)), 2, '0'))"
+end
+
+function collect_ev_data_dates(problem_df::AbstractDataFrame)
+    ev_data_dates = String[]
+    problem_dates = vcat(collect(problem_df.dstart), collect(problem_df.dend))
+
+    for problem_date in problem_dates
+        ismissing(problem_date) && continue
+        profile_year = format_ev_profile_year(problem_date)
+        profile_year in ev_data_dates || push!(ev_data_dates, profile_year)
+    end
+
+    return ev_data_dates
+end
+# Preamble
 # ---------------------------------- #
 # EV profiles 
 # ---------------------------------- #
@@ -509,7 +534,7 @@ subregional_demand_allocation_df = melt_subregional_demand_allocation_dataframe(
     build_subregional_demand_allocation_dataframe(iasr_workbook_path),
 )
 
-bus_id_by_name = Dict(row.name => row.id_bus for row in eachrow(ts.bus))
+bus_id_by_name     = Dict(row.name => row.id_bus for row in eachrow(ts.bus))
 missing_subregions = unique(
     filter(subregion -> !haskey(bus_id_by_name, subregion), subregional_demand_allocation_df.subregion),
 )
@@ -524,29 +549,6 @@ subregional_demand_allocation_df.id_bus =
 # ======================================= #
 # Implementation of the profile calculation
 # ======================================= #
-function format_ev_profile_year(date_value::TimeType)
-    current_year = year(date_value)
-
-    if month(date_value) <= 6
-        return "$(current_year - 1)_$(lpad(string(mod(current_year, 100)), 2, '0'))"
-    end
-
-    return "$(current_year)_$(lpad(string(mod(current_year + 1, 100)), 2, '0'))"
-end
-
-function collect_ev_data_dates(problem_df::AbstractDataFrame)
-    ev_data_dates = String[]
-    problem_dates = vcat(collect(problem_df.dstart), collect(problem_df.dend))
-
-    for problem_date in problem_dates
-        ismissing(problem_date) && continue
-        profile_year = format_ev_profile_year(problem_date)
-        profile_year in ev_data_dates || push!(ev_data_dates, profile_year)
-    end
-
-    return ev_data_dates
-end
-
 ev_data_dates = collect_ev_data_dates(tc.problem)
 scenarios     = unique(tc.problem.scenario)
 
@@ -656,7 +658,26 @@ for sc in scenario_ids
         all_stacked = vcat(all_stacked, stacked_profiles)
     end
 end
-# for all_stacked, add the column `id` at the beginning of the dataframe with unique integer values starting from 1
-all_stacked.id = 1:nrow(all_stacked)
+
+
+all_stacked.id_bus = parse.(Int64, all_stacked.id_bus)
 select!(all_stacked, [:id, :id_bus, :scenario,  :date, :value])
-CSV.write(joinpath(downloadpath, "ev_profiles_test.csv"), all_stacked, header=true)
+
+# Create mapping dict from bus id to der id for the ev profiles
+map_id_dem_der_ev = OrderedDict(row.id_dem => row.id_der for row in eachrow(ts.der) if row.tech == "EV")
+
+missing_ev_profile_bus_ids = unique(filter(id_bus -> !haskey(map_id_dem_der_ev, id_bus), all_stacked.id_bus))
+isempty(missing_ev_profile_bus_ids) || error(
+    "Missing `id_der` mapping for EV profile bus ids: $(join(string.(missing_ev_profile_bus_ids), ", ")).",
+)
+
+all_stacked.id_der = [map_id_dem_der_ev[id_bus][1] for id_bus in all_stacked.id_bus]
+# move id_der column before id_bus and drop id_bus column
+select!(all_stacked, [:id, :id_der, :scenario, :date, :value])
+
+# order all_stacked by id_der, scenario, date
+sort!(all_stacked, [:id_der, :scenario, :date])
+
+der_pred_id = maximum(tv.der_pred.id)
+all_stacked.id     = der_pred_id+1:nrow(all_stacked)+der_pred_id
+append!(tv.der_pred, all_stacked)

@@ -27,10 +27,10 @@ target_year = 2030
 exclude_charging = [] # "Convenience Charging", "Daytime Charging", "Highway Fast Charging", "Nighttime Charging", "Vehicle to Grid", "Vehicle to Home"
 #%%
 # Read in the data
-profiles    = CSV.read("_personal scripts/DER/data/EVprofiles.csv", DataFrame)
-shares      = CSV.read("_personal scripts/DER/data/EVshares.csv", DataFrame)
-numbers     = CSV.read("_personal scripts/DER/data/EVnumbers.csv", DataFrame)
-subregional = CSV.read("_personal scripts/DER/data/EVsubregional.csv", DataFrame)
+profiles    = CSV.read("/Users/papablaza/git/ARPST-CSIRO-STAGE-5/PISP-dev-pub.jl/src/main/dev-ev-data/EVprofiles.csv", DataFrame)
+shares      = CSV.read("/Users/papablaza/git/ARPST-CSIRO-STAGE-5/PISP-dev-pub.jl/src/main/dev-ev-data/EVshares.csv", DataFrame)
+numbers     = CSV.read("/Users/papablaza/git/ARPST-CSIRO-STAGE-5/PISP-dev-pub.jl/src/main/dev-ev-data/EVnumbers.csv", DataFrame)
+subregional = CSV.read("/Users/papablaza/git/ARPST-CSIRO-STAGE-5/PISP-dev-pub.jl/src/main/dev-ev-data/EVsubregional.csv", DataFrame)
 
 # Creating relevant datetime vectors
 start_dt             = DateTime("$(target_year)-01-01 00:00:00", dateformat"yyyy-mm-dd HH:MM:SS")
@@ -47,10 +47,23 @@ profiles          = leftjoin(profiles, numbers, on=["state", "type"])
 profiles.category = [car_type_mapping[string(t)] for t in profiles.type]
 profiles          = leftjoin(profiles, shares[:, [:state, :category, :charging, :share]], on=["state", "category", "charging"])
 
+profile_start_index = findfirst(==("0:00"), names(profiles))
+profile_end_index   = findfirst(==("23:30"), names(profiles))
+
+if !isnothing(profile_start_index) && !isnothing(profile_end_index) && profile_start_index <= profile_end_index
+    leading_columns = names(profiles)[1:(profile_start_index - 1)]
+    profile_columns = names(profiles)[profile_start_index:profile_end_index]
+    trailing_columns = names(profiles)[(profile_end_index + 1):end]
+    select!(profiles, vcat(leading_columns, trailing_columns, profile_columns))
+end
+
+
 # Remove excluded charging types
-profiles = filter(row -> !(row.charging in exclude_charging), profiles)
+profiles = filter(row -> !(row.charging in exclude_charging), profiles) # Is this necessary? 
 
 # Calculate the number of BEVs and PHEVs for each profile
+# Here the idea is to calculate the number of vehicles that contribute to the profile, 
+# but in reality, I would calculate first the absolute number of vehicles (numberBEV + numberPHEV), multiply by the profile and then multiply by the share.
 profiles.numberBEV    = profiles.numberBEV .* profiles.share
 profiles.numberPHEV   = profiles.numberPHEV .* profiles.share
 profiles.total_number = profiles.numberBEV .+ profiles.numberPHEV
@@ -76,11 +89,15 @@ total_profiles_weekend = total_profiles_weekend[:, Not(profile_column_names[2:2:
 
 # Finally sum up the profiles and assign to each state then subregion for the whole year
 all_times = collect(start_dt:Hour(1):start_dt + Year(1) - Hour(1))
-weekday = dayofweek.(all_times) .<= 5
+weekday   = dayofweek.(all_times) .<= 5
 
 final_profiles = DataFrame(date=all_times)
 for region in unique(subregional.region_id)
     final_profiles[!, "$region"] = zeros(length(all_times))
+end
+
+function get_financial_year_string(dt::DateTime)
+
 end
 
 for state in unique(profiles.state)
@@ -91,6 +108,9 @@ for state in unique(profiles.state)
     subregional_idxs = subregional[subregional.state .== state, :region_id]
 
     for i in eachindex(all_times)
+        t = all_times[i] # Current timestep (needed to collect the correct share value depending on the financial year)
+        fy = 
+        
         if weekday[i]
             final_profiles[i, string.(subregional_idxs)] .= weekday_profile[hour(all_times[i]) + 1] .* subregional_shares
         else
