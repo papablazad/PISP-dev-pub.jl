@@ -83,6 +83,8 @@ function build_demand_plot(
     scenarios::Union{Nothing,AbstractVector{<:Integer}}=nothing,
     output_root::AbstractString=DEFAULT_OUTPUT_ROOT,
     demand_ids=nothing,
+    start_dt::Union{Nothing,DateTime}=nothing,
+    end_dt::Union{Nothing,DateTime}=nothing,
     output_html::Union{Nothing,AbstractString}=nothing,
 )
     HAS_PLOTLYJS || error(
@@ -92,6 +94,14 @@ function build_demand_plot(
 
     demand_df, merged_df = prepare_demand_data(year; output_root=output_root, demand_ids=demand_ids)
 
+    if start_dt !== nothing
+        merged_df = filter(:date => dt -> dt >= start_dt, merged_df)
+    end
+    if end_dt !== nothing
+        merged_df = filter(:date => dt -> dt <= end_dt, merged_df)
+    end
+    isempty(merged_df) && error("No schedule rows remain after applying the requested datetime window")
+
     available_scenarios = sort!(unique(merged_df.scenario))
     selected_scenarios = scenarios === nothing ? collect(available_scenarios) : sort!(unique!(collect(Int.(scenarios))))
     all(sc -> sc in available_scenarios, selected_scenarios) ||
@@ -100,9 +110,9 @@ function build_demand_plot(
     default_scenario = first(selected_scenarios)
 
     n_demands = nrow(demand_df)
-    subplot_titles = Matrix{Union{Missing,String}}(missing, n_demands, 1)
+    subplot_titles = Matrix{Union{Missing,String}}(missing, 1, n_demands)
     for (row_index, demand_row) in enumerate(eachrow(demand_df))
-        subplot_titles[row_index, 1] = "$(demand_row.name) (id_dem=$(demand_row.id_dem))"
+        subplot_titles[1, row_index] = "$(demand_row.name) (id_dem=$(demand_row.id_dem))"
     end
     palette = [
         "#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b",
@@ -115,6 +125,8 @@ function build_demand_plot(
         shared_xaxes=true,
         vertical_spacing=max(0.003, 0.05 / max(n_demands, 1)),
         subplot_titles=subplot_titles,
+        x_title="Date",
+        y_title="MW",
     )
 
     for sc in selected_scenarios
@@ -125,10 +137,11 @@ function build_demand_plot(
                 x=series_df.date,
                 y=series_df.value,
                 mode="lines",
-                name="$(demand_row.name) (scenario $(sc))",
+                name="$(demand_row.name) (id_dem=$(demand_row.id_dem))",
+                legendgroup="id_dem_$(demand_row.id_dem)",
                 line=PlotlyJS.attr(color=palette[mod1(row_index, length(palette))], width=1.4),
                 visible=sc == default_scenario,
-                showlegend=false,
+                showlegend=true,
                 hovertemplate=
                     "name=$(demand_row.name)<br>" *
                     "id_dem=$(demand_row.id_dem)<br>" *
@@ -164,6 +177,7 @@ function build_demand_plot(
         :hovermode => "x",
         :title_text => "Demand load schedule by id_dem, year $(year), scenario $(default_scenario)",
         :margin => PlotlyJS.attr(l=90, r=40, t=90, b=70),
+        :legend => PlotlyJS.attr(orientation="h", x=0.0, y=1.04, xanchor="left", yanchor="bottom"),
         :updatemenus => [
             PlotlyJS.attr(
                 type="dropdown",
@@ -176,16 +190,6 @@ function build_demand_plot(
                 buttons=buttons,
             ),
         ],
-        :annotations => [PlotlyJS.attr(text="Scenario", x=1.02, y=1.06, xref="paper", yref="paper", showarrow=false)],
-    )
-
-    for row_index in 1:n_demands
-        layout_updates[axis_key("yaxis", row_index)] = PlotlyJS.attr(title_text="MW", fixedrange=false)
-    end
-
-    layout_updates[axis_key("xaxis", n_demands)] = PlotlyJS.attr(
-        title_text="Date",
-        rangeslider=PlotlyJS.attr(visible=true),
     )
 
     PlotlyJS.relayout!(fig, layout_updates)
@@ -203,6 +207,8 @@ function main(
     year::Integer=DEFAULT_YEAR,
     scenarios::AbstractVector{<:Integer}=[DEFAULT_SCENARIO],
     id_dems::AbstractVector{<:Integer}=Int[];
+    start_dt::Union{Nothing,DateTime}=nothing,
+    end_dt::Union{Nothing,DateTime}=nothing,
     output_html::Union{Nothing,AbstractString}=nothing,
     output_root::AbstractString=DEFAULT_OUTPUT_ROOT,
 )
@@ -216,12 +222,20 @@ function main(
         scenarios=scenario_list,
         output_root=output_root,
         demand_ids=demand_list,
+        start_dt=start_dt,
+        end_dt=end_dt,
         output_html=html_path,
     )
-    display(fig)
     fig
 end
 
 # Example execution from the Julia REPL:
 # include("src/main/test-tas-data.jl")
-main(2030, [1, 2, 3], [10])
+fig = main(
+    2030,
+    [2],
+    [10];
+    start_dt=DateTime(2030, 6, 29),
+    end_dt=DateTime(2030, 7, 2, 23, 30),
+)
+display(fig)
